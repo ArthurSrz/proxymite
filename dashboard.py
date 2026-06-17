@@ -77,7 +77,7 @@ def _login_wall() -> None:
     _, mid, _ = st.columns([1, 2, 1])
     with mid:
         if _logo_path.exists():
-            st.image(str(_logo_path), use_container_width=True)
+            st.image(str(_logo_path), width="stretch")
         else:
             st.markdown(f"<div style='text-align:center'><span style='font-size:2rem;font-weight:900;color:{C['yellow']}'>DATACK</span></div>",
                         unsafe_allow_html=True)
@@ -87,7 +87,7 @@ def _login_wall() -> None:
     with st.form("login", border=False):
         _, mid2, _ = st.columns([1, 2, 1])
         with mid2:
-            pwd = st.text_input("", type="password", placeholder="Mot de passe…")
+            pwd = st.text_input("Mot de passe", type="password", placeholder="Mot de passe…", label_visibility="collapsed")
             submitted = st.form_submit_button("Accéder au tableau de bord")
 
     if submitted:
