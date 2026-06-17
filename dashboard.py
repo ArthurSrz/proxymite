@@ -165,8 +165,9 @@ def tag(label: str, b: bool = False) -> str:
 @st.cache_data
 def load() -> pd.DataFrame:
     df = pd.read_csv("data/effectifs_personnels_EN.csv", low_memory=False)
-    df["has_etp"] = df["etp_enseignants"].notna()
-    df["has_pct"] = df["pct_femmes"].notna()
+    df["has_etp"]   = df["etp_enseignants"].notna()
+    df["has_pct"]   = df["pct_femmes"].notna()
+    df["has_ratio"] = df["eleves_par_etp"].notna()
     return df
 
 df = load()
@@ -239,12 +240,14 @@ st.markdown(f"""<div style="padding:28px 0 20px">
 
 # ── KPIs ─────────────────────────────────────────────────────────────────────────
 def _kpi_rows(etp, pct, label_suffix=""):
+    ratio_src = etp[etp["has_ratio"]]
+    ratio_val = f"{ratio_src['eleves_par_etp'].median():.1f} él./ETP" if len(ratio_src) else "—"
     return [
-        (f"ETP total{label_suffix}",      f"{etp['etp_enseignants'].sum():,.0f}"),
+        (f"ETP total{label_suffix}",        f"{etp['etp_enseignants'].sum():,.0f}"),
         (f"ETP moyen / école{label_suffix}", f"{etp['etp_enseignants'].mean():.1f}"),
-        (f"Femmes{label_suffix}",          f"{pct['pct_femmes'].mean():.1f}%"          if len(pct) else "—"),
-        (f"Non-titulaires{label_suffix}",  f"{pct['pct_non_titulaires'].mean():.1f}%"  if len(pct) else "—"),
-        (f"Ancienneté ≥8 ans{label_suffix}", f"{pct['pct_anciennete_8_ans_plus'].mean():.1f}%" if len(pct) else "—"),
+        (f"Élèves / ETP{label_suffix}",     ratio_val),
+        (f"Femmes{label_suffix}",           f"{pct['pct_femmes'].mean():.1f}%"          if len(pct) else "—"),
+        (f"Non-titulaires{label_suffix}",   f"{pct['pct_non_titulaires'].mean():.1f}%"  if len(pct) else "—"),
     ]
 
 def _kpi_html_row(kpis, color, header):
@@ -358,6 +361,65 @@ with tab1:
                               textposition="outside", textfont_color=C["white"])
             fig.update_layout(**plt(height=200, showlegend=False, yaxis_visible=False, yaxis_showgrid=False))
         st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # ── Encadrement : élèves par ETP ────────────────────────────────────────────
+    ratio_a = etp_a[etp_a["has_ratio"]]
+    ratio_b = etp_b[etp_b["has_ratio"]] if etp_b is not None else None
+
+    col_r1, col_r2 = st.columns(2)
+
+    with col_r1:
+        st.markdown(tag("Encadrement"), unsafe_allow_html=True)
+        st.markdown("#### Élèves pour 1 ETP enseignant — distribution")
+        cap_r = ratio_a["eleves_par_etp"].quantile(0.99)
+        fig = go.Figure()
+        fig.add_trace(go.Histogram(
+            x=ratio_a[ratio_a["eleves_par_etp"] <= cap_r]["eleves_par_etp"],
+            nbinsx=50, marker_color=C["yellow"], marker_line_width=0,
+            name="Groupe A" if ab_mode else "Étab.",
+        ))
+        if ab_mode and ratio_b is not None and len(ratio_b):
+            cap_rb = ratio_b["eleves_par_etp"].quantile(0.99)
+            fig.add_trace(go.Histogram(
+                x=ratio_b[ratio_b["eleves_par_etp"] <= cap_rb]["eleves_par_etp"],
+                nbinsx=50, marker_color=C["teal"], marker_line_width=0, opacity=0.7,
+                name="Groupe B",
+            ))
+            fig.update_layout(**plt(height=280, barmode="overlay"))
+        else:
+            med_r = ratio_a["eleves_par_etp"].median()
+            fig.add_vline(x=med_r, line_dash="dash", line_color=C["teal"],
+                          annotation_text=f"Médiane {med_r:.1f}",
+                          annotation_font_color=C["teal"], annotation_position="top right")
+            fig.update_layout(**plt(height=280, showlegend=False,
+                                    xaxis_title="Élèves / ETP enseignant"))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_r2:
+        st.markdown(tag("Par type"), unsafe_allow_html=True)
+        st.markdown("#### Médiane élèves/ETP par type d'établissement")
+        if len(ratio_a):
+            by_type = (ratio_a.groupby("type_etablissement")["eleves_par_etp"]
+                       .median().reset_index()
+                       .sort_values("eleves_par_etp", ascending=True)
+                       .tail(15))  # top 15 types for readability
+            med_nat = ratio_a["eleves_par_etp"].median()
+            fig = go.Figure(go.Bar(
+                x=by_type["eleves_par_etp"], y=by_type["type_etablissement"],
+                orientation="h",
+                marker_color=[C["yellow"] if v >= med_nat else C["teal"] for v in by_type["eleves_par_etp"]],
+                marker_line_width=0,
+                hovertemplate="%{y} : %{x:.1f} él./ETP<extra></extra>",
+                text=by_type["eleves_par_etp"].round(1), textposition="outside",
+                textfont_color=C["white"],
+            ))
+            fig.add_vline(x=med_nat, line_dash="dash", line_color=C["white"],
+                          annotation_text=f"Médiane nat. {med_nat:.1f}",
+                          annotation_font_color=C["white"], annotation_position="top right")
+            fig.update_layout(**plt(height=280, xaxis_title="Élèves / ETP"))
+            st.plotly_chart(fig, use_container_width=True)
 
     if not ab_mode:
         st.divider()
