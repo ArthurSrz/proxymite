@@ -398,10 +398,14 @@ with tab1:
             fig.update_layout(**plt(height=280, barmode="overlay"))
         else:
             med_r = ratio_a["eleves_par_etp"].median()
-            fig.add_vline(x=med_r, line_dash="dash", line_color=C["teal"],
-                          annotation_text=f"Médiane {med_r:.1f}",
-                          annotation_font_color=C["teal"], annotation_position="top right")
+            fig.add_shape(type="line", x0=med_r, x1=med_r, y0=0, y1=1, yref="paper",
+                          line=dict(color=C["teal"], width=1.5, dash="dash"))
+            fig.add_annotation(x=med_r, y=1.0, yref="paper", xanchor="left", yanchor="bottom",
+                                text=f"<b> MÉD. {med_r:.1f} </b>", showarrow=False,
+                                font=dict(size=10, color=C["black"], family="monospace"),
+                                bgcolor=C["teal"], borderpad=3)
             fig.update_layout(**plt(height=280, showlegend=False,
+                                    margin=dict(l=16, r=16, t=44, b=16),
                                     xaxis_title="Élèves / ETP enseignant"))
         st.plotly_chart(fig, use_container_width=True)
 
@@ -423,10 +427,14 @@ with tab1:
                 text=by_type["eleves_par_etp"].round(1), textposition="outside",
                 textfont_color=C["white"],
             ))
-            fig.add_vline(x=med_nat, line_dash="dash", line_color=C["white"],
-                          annotation_text=f"Médiane nat. {med_nat:.1f}",
-                          annotation_font_color=C["white"], annotation_position="top right")
-            fig.update_layout(**plt(height=280, xaxis_title="Élèves / ETP"))
+            fig.add_shape(type="line", x0=med_nat, x1=med_nat, y0=0, y1=1, yref="paper",
+                          line=dict(color=C["gray"], width=1.5, dash="dot"))
+            fig.add_annotation(x=med_nat, y=1.0, yref="paper", xanchor="left", yanchor="bottom",
+                                text=f"<b> MÉD. NAT. {med_nat:.1f} </b>", showarrow=False,
+                                font=dict(size=10, color=C["black"], family="monospace"),
+                                bgcolor=C["gray"], borderpad=3)
+            fig.update_layout(**plt(height=280, margin=dict(l=16, r=16, t=44, b=16),
+                                    xaxis_title="Élèves / ETP"))
             st.plotly_chart(fig, use_container_width=True)
 
     if not ab_mode:
@@ -470,10 +478,14 @@ with tab2:
                 fig.update_layout(**plt(height=300, barmode="overlay"))
             else:
                 moy_f = pct_a["pct_femmes"].mean()
-                fig.add_vline(x=moy_f, line_dash="dash", line_color=C["white"],
-                              annotation_text=f"Moy. {moy_f:.1f}%", annotation_font_color=C["white"],
-                              annotation_position="top left")
-                fig.update_layout(**plt(height=300, showlegend=False))
+                fig.add_shape(type="line", x0=moy_f, x1=moy_f, y0=0, y1=1, yref="paper",
+                              line=dict(color=C["gray"], width=1.5, dash="dot"))
+                fig.add_annotation(x=moy_f, y=1.0, yref="paper", xanchor="left", yanchor="bottom",
+                                    text=f"<b> MOY. {moy_f:.1f}% </b>", showarrow=False,
+                                    font=dict(size=10, color=C["black"], family="monospace"),
+                                    bgcolor=C["gray"], borderpad=3)
+                fig.update_layout(**plt(height=300, showlegend=False,
+                                        margin=dict(l=16, r=16, t=44, b=16)))
             st.plotly_chart(fig, use_container_width=True)
 
         with col_d:
@@ -527,9 +539,13 @@ with tab2:
                 marker_color=[C["yellow"] if v >= avg_f else C["teal"] for v in reg_f["pct_femmes"]],
                 marker_line_width=0, hovertemplate="%{x} : %{y:.1f}%<extra></extra>",
             ))
-            fig.add_hline(y=avg_f, line_dash="dash", line_color=C["white"],
-                          annotation_text=f"Moy. {avg_f:.1f}%", annotation_font_color=C["white"])
-            fig.update_layout(**plt(height=300))
+            fig.add_shape(type="line", x0=0, x1=1, xref="paper", y0=avg_f, y1=avg_f,
+                          line=dict(color=C["gray"], width=1.5, dash="dot"))
+            fig.add_annotation(x=1.0, xref="paper", y=avg_f, xanchor="right", yanchor="bottom",
+                                text=f"<b> MOY. {avg_f:.1f}% </b>", showarrow=False,
+                                font=dict(size=10, color=C["black"], family="monospace"),
+                                bgcolor=C["gray"], borderpad=3)
+            fig.update_layout(**plt(height=300, margin=dict(l=16, r=16, t=44, b=16)))
         st.plotly_chart(fig, use_container_width=True)
 
         st.markdown(tag("Précarité"), unsafe_allow_html=True)
