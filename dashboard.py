@@ -330,13 +330,21 @@ with tab1:
             fig.update_layout(**plt(height=240, barmode="overlay"))
         else:
             med, moy = etp_a["etp_enseignants"].median(), etp_a["etp_enseignants"].mean()
-            fig.add_vline(x=med, line_dash="dash", line_color=C["teal"],
-                          annotation_text=f"Médiane {med:.1f}",
-                          annotation_font_color=C["teal"], annotation_position="top right")
-            fig.add_vline(x=moy, line_dash="dot", line_color=C["white"],
-                          annotation_text=f"Moy. {moy:.1f}",
-                          annotation_font_color=C["white"], annotation_position="bottom right")
-            fig.update_layout(**plt(height=240, showlegend=False))
+            # Lines
+            fig.add_shape(type="line", x0=med, x1=med, y0=0, y1=1, yref="paper",
+                          line=dict(color=C["teal"], width=1.5, dash="dash"))
+            fig.add_shape(type="line", x0=moy, x1=moy, y0=0, y1=1, yref="paper",
+                          line=dict(color=C["gray"], width=1.5, dash="dot"))
+            # Floating pill badges above the bars
+            fig.add_annotation(x=med, y=1.0, yref="paper", xanchor="left", yanchor="bottom",
+                                text=f"<b> MÉD. {med:.1f} </b>", showarrow=False,
+                                font=dict(size=10, color=C["black"], family="monospace"),
+                                bgcolor=C["teal"], borderpad=3)
+            fig.add_annotation(x=moy, y=0.88, yref="paper", xanchor="left", yanchor="bottom",
+                                text=f"<b> MOY. {moy:.1f} </b>", showarrow=False,
+                                font=dict(size=10, color=C["black"], family="monospace"),
+                                bgcolor=C["gray"], borderpad=3)
+            fig.update_layout(**plt(height=260, showlegend=False, margin=dict(l=16, r=16, t=44, b=16)))
         st.plotly_chart(fig, use_container_width=True)
 
         st.markdown(tag("1er vs 2d degré"), unsafe_allow_html=True)
@@ -780,11 +788,11 @@ with tab5:
                 radar_fig = go.Figure()
                 radar_fig.add_trace(go.Scatterpolar(
                     r=acad_r, theta=theta, fill="toself", name=f"Académie {acad}",
-                    line_color=C["teal"], fillcolor=f"{C['teal']}22",
+                    line_color=C["teal"], fillcolor="rgba(78,205,196,0.13)",
                 ))
                 radar_fig.add_trace(go.Scatterpolar(
                     r=school_r, theta=theta, fill="toself", name=row["nom_etablissement"],
-                    line_color=C["yellow"], fillcolor=f"{C['yellow']}33",
+                    line_color=C["yellow"], fillcolor="rgba(200,255,0,0.20)",
                 ))
                 radar_fig.update_layout(
                     polar=dict(
