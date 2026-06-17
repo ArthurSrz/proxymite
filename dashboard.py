@@ -241,7 +241,7 @@ st.markdown(f"""<div style="padding:28px 0 20px">
 # ── KPIs ─────────────────────────────────────────────────────────────────────────
 def _kpi_rows(etp, pct, label_suffix=""):
     ratio_src = etp[etp["has_ratio"]]
-    ratio_val = f"{ratio_src['eleves_par_etp'].median():.1f} él./ETP" if len(ratio_src) else "—"
+    ratio_val = f"{ratio_src['eleves_par_etp'].median():.1f}" if len(ratio_src) else "—"
     return [
         (f"ETP total{label_suffix}",        f"{etp['etp_enseignants'].sum():,.0f}"),
         (f"ETP moyen / école{label_suffix}", f"{etp['etp_enseignants'].mean():.1f}"),

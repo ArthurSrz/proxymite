@@ -77,10 +77,7 @@ def enrich():
     print(f"Loading {CSV_PATH}...")
     df = pd.read_csv(CSV_PATH, low_memory=False)
 
-    # Drop old columns if re-running
-    for col in ["nb_eleves", "eleves_par_etp", "ratio_eleves_par_etp"]:
-        if col in df.columns:
-            df = df.drop(columns=[col])
+    df = df.drop(columns=[c for c in ["nb_eleves", "eleves_par_etp"] if c in df.columns])
 
     eleves = build_eleves_index()
     print(f"\nElèves index built: {len(eleves):,} établissements")

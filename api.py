@@ -52,6 +52,7 @@ FIELDNAMES: list[str] = [
     "pct_moins_35_ans", "pct_35_50_ans", "pct_plus_50_ans",
     "pct_anciennete_moins_2_ans", "pct_anciennete_2_5_ans",
     "pct_anciennete_5_8_ans", "pct_anciennete_8_ans_plus",
+    "nb_eleves", "eleves_par_etp",
 ]
 
 _ANNUAIRE_KEYS = {
@@ -62,7 +63,7 @@ _ANNUAIRE_KEYS = {
     "date_ouverture", "etat", "libelle_nature", "appartenance_education_prioritaire",
 }
 _EMPTY_PERSONNEL: dict[str, str] = {k: "" for k in FIELDNAMES if k not in _ANNUAIRE_KEYS}
-_FLOAT_FIELDS = {f for f in FIELDNAMES if f.startswith(("etp_", "pct_", "lat", "lon"))}
+_FLOAT_FIELDS = {f for f in FIELDNAMES if f.startswith(("etp_", "pct_", "lat", "lon", "nb_", "eleves_"))}
 
 # ---------------------------------------------------------------------------
 # Schema
@@ -117,6 +118,8 @@ class Etablissement(BaseModel):
     pct_anciennete_2_5_ans: float | None = None
     pct_anciennete_5_8_ans: float | None = None
     pct_anciennete_8_ans_plus: float | None = None
+    nb_eleves: float | None = None
+    eleves_par_etp: float | None = None
 
 
 class PaginatedResponse(BaseModel):
