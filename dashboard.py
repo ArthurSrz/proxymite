@@ -77,7 +77,7 @@ def _login_wall() -> None:
         else:
             st.markdown(f"<div style='text-align:center'><span style='font-size:2rem;font-weight:900;color:{C['yellow']}'>DATACK</span></div>",
                         unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align:center;color:{C['gray']};font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;margin:4px 0 32px'>× Éducation Nationale</p>",
+        st.markdown(f"<p style='text-align:center;color:{C['gray']};font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;margin:4px 0 32px'>× FSU-SNUipp</p>",
                     unsafe_allow_html=True)
 
     with st.form("login", border=False):
@@ -199,7 +199,7 @@ with st.sidebar:
     st.markdown(f"""<div style="padding:16px 0 24px">
       {logo_img(36, "0")}
       <span style="font-size:.6rem;color:{C['gray']};display:block;margin-top:8px;
-            letter-spacing:.15em;text-transform:uppercase">× Éducation Nationale</span>
+            letter-spacing:.15em;text-transform:uppercase">× FSU-SNUipp</span>
     </div>""", unsafe_allow_html=True)
 
     ab_mode = st.toggle("Mode A/B", value=False, help="Comparer deux groupes côte à côte")
