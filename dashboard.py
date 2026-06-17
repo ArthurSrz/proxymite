@@ -1,14 +1,39 @@
 """
-Tableau de bord — Effectifs personnels de l'Éducation Nationale
-Design system: Datack (datack.fr) — noir / jaune néon / blanc
+Effectifs enseignants — Éducation Nationale · Rentrée 2024
+Design system : Datack (datack.fr) — noir / jaune néon / blanc
 """
 
+import base64
+import hashlib
+from pathlib import Path
+
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
+import plotly.express as px
 import streamlit as st
 
-# ── Config ─────────────────────────────────────────────────────────────────────
+# ── Design tokens ───────────────────────────────────────────────────────────────
+C = {
+    "yellow": "#C8FF00",
+    "black":  "#0D0D0D",
+    "card":   "#1A1A1A",
+    "white":  "#FFFFFF",
+    "gray":   "#888888",
+    "border": "#2A2A2A",
+    "teal":   "#4ECDC4",
+    "red":    "#FF6B6B",
+}
+
+# ── Logo ────────────────────────────────────────────────────────────────────────
+_logo_path = Path("media/logo-datack.png")
+_logo_b64  = base64.b64encode(_logo_path.read_bytes()).decode() if _logo_path.exists() else None
+
+def logo_img(height: int = 48, margin: str = "0 auto") -> str:
+    if _logo_b64:
+        return f'<img src="data:image/png;base64,{_logo_b64}" style="height:{height}px;display:block;margin:{margin}">'
+    return f'<span style="font-size:1.8rem;font-weight:900;color:{C["yellow"]}">DATACK</span>'
+
+# ── Page config ─────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Effectifs EN · Datack",
     page_icon="🎓",
@@ -16,622 +41,443 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Design system Datack ────────────────────────────────────────────────────────
-YELLOW  = "#C8FF00"
-BLACK   = "#0D0D0D"
-CARD_BG = "#1A1A1A"
-WHITE   = "#FFFFFF"
-GRAY    = "#888888"
-BORDER  = "#2A2A2A"
+# ── Auth ─────────────────────────────────────────────────────────────────────────
+def _check_password(candidate: str) -> bool:
+    correct = st.secrets.get("password", "")
+    h = lambda s: hashlib.sha256(s.encode()).hexdigest()
+    return h(candidate) == h(correct)
 
-st.markdown(f"""
-<style>
-  /* Base */
-  .stApp {{ background-color: {BLACK}; color: {WHITE}; }}
-  section[data-testid="stSidebar"] {{ background-color: {CARD_BG}; border-right: 1px solid {BORDER}; }}
-  section[data-testid="stSidebar"] * {{ color: {WHITE} !important; }}
+def _login_wall() -> None:
+    st.markdown(f"""<style>
+      html, body, .stApp {{ background-color:{C["black"]} !important; }}
+      .stAppHeader, header[data-testid="stHeader"] {{ display:none !important; }}
+      section[data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display:none !important; }}
+      .stMainBlockContainer {{ max-width:100% !important; }}
+      [data-testid="stVerticalBlock"] {{ max-width:420px; margin:0 auto; }}
+      input[type="password"] {{
+        background:#1A1A1A !important; border:1px solid #2A2A2A !important;
+        border-radius:10px !important; color:#fff !important;
+        font-size:1rem !important; padding:12px 16px !important; width:100% !important;
+      }}
+      input[type="password"]::placeholder {{ color:{C["gray"]} !important; }}
+      .stFormSubmitButton > button {{
+        width:100%; background:{C["yellow"]} !important; color:{C["black"]} !important;
+        border:none !important; border-radius:10px !important;
+        font-weight:800 !important; padding:12px !important; margin-top:8px;
+      }}
+      [data-testid="stForm"] {{ border:none !important; padding:0 !important; }}
+    </style>
+    <div style="text-align:center;padding:80px 0 40px">
+      {logo_img(48)}
+      <p style="color:{C["gray"]};font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;margin:10px 0 0">
+        × Éducation Nationale
+      </p>
+    </div>""", unsafe_allow_html=True)
 
-  /* Typography */
-  h1, h2, h3, h4 {{ color: {WHITE} !important; font-weight: 800 !important; letter-spacing: -0.02em; }}
+    with st.form("login", border=False):
+        pwd = st.text_input("", type="password", placeholder="Mot de passe…")
+        submitted = st.form_submit_button("Accéder au tableau de bord")
 
-  /* Metric cards */
+    if submitted:
+        if _check_password(pwd):
+            st.session_state["ok"] = True
+            st.rerun()
+        else:
+            st.error("Mot de passe incorrect.")
+
+    st.markdown(f"<p style='text-align:center;color:{C['gray']};font-size:.72rem;margin-top:24px'>Accès restreint · Rentrée 2024</p>",
+                unsafe_allow_html=True)
+
+if not st.session_state.get("ok"):
+    _login_wall()
+    st.stop()
+
+# ── Global CSS (post-auth) ───────────────────────────────────────────────────────
+st.markdown(f"""<style>
+  .stApp {{ background-color:{C["black"]}; color:{C["white"]}; }}
+  .stAppHeader, header[data-testid="stHeader"] {{ display:none !important; }}
+  section[data-testid="stSidebar"] {{
+    background-color:{C["card"]}; border-right:1px solid {C["border"]};
+  }}
+  section[data-testid="stSidebar"] * {{ color:{C["white"]} !important; }}
+  h1,h2,h3,h4 {{ color:{C["white"]} !important; font-weight:800 !important; letter-spacing:-.02em; }}
   [data-testid="stMetric"] {{
-    background: {CARD_BG};
-    border: 1px solid {BORDER};
-    border-radius: 16px;
-    padding: 20px 24px !important;
+    background:{C["card"]}; border:1px solid {C["border"]}; border-radius:16px; padding:20px 24px !important;
   }}
-  [data-testid="stMetricLabel"] {{ color: {GRAY} !important; font-size: 0.78rem !important; text-transform: uppercase; letter-spacing: 0.1em; }}
-  [data-testid="stMetricValue"] {{ color: {YELLOW} !important; font-size: 2rem !important; font-weight: 800 !important; }}
-  [data-testid="stMetricDelta"] {{ color: {WHITE} !important; }}
-
-  /* Tabs */
-  [data-baseweb="tab-list"] {{ background: {CARD_BG}; border-radius: 12px; padding: 4px; gap: 4px; }}
-  [data-baseweb="tab"] {{ color: {GRAY} !important; border-radius: 8px !important; font-weight: 600; }}
-  [aria-selected="true"] {{ background: {YELLOW} !important; color: {BLACK} !important; }}
-
-  /* Selectbox / multiselect */
-  [data-baseweb="select"] > div {{ background: {CARD_BG} !important; border-color: {BORDER} !important; color: {WHITE} !important; border-radius: 10px !important; }}
-  [data-baseweb="popover"] {{ background: {CARD_BG} !important; }}
-
-  /* Slider */
-  [data-testid="stSlider"] div[role="slider"] {{ background: {YELLOW}; }}
-
-  /* Divider */
-  hr {{ border-color: {BORDER} !important; }}
-
-  /* Section card wrapper */
-  .datack-card {{
-    background: {CARD_BG};
-    border: 1px solid {BORDER};
-    border-radius: 20px;
-    padding: 24px;
-    margin-bottom: 16px;
+  [data-testid="stMetricLabel"] p {{
+    color:{C["gray"]} !important; font-size:.72rem !important;
+    text-transform:uppercase; letter-spacing:.1em; white-space:normal !important;
   }}
-  .datack-tag {{
-    display: inline-block;
-    background: {YELLOW};
-    color: {BLACK};
-    font-size: 0.7rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    padding: 4px 12px;
-    border-radius: 100px;
-    margin-bottom: 8px;
+  [data-testid="stMetricValue"] {{ color:{C["yellow"]} !important; font-size:1.9rem !important; font-weight:800 !important; }}
+  [data-baseweb="tab-list"] {{
+    background:{C["card"]}; border-radius:12px; padding:4px; gap:4px; border:1px solid {C["border"]};
   }}
+  [data-baseweb="tab"] {{ color:{C["gray"]} !important; border-radius:8px !important; font-weight:600; padding:8px 16px !important; }}
+  [aria-selected="true"] {{ background:{C["yellow"]} !important; color:{C["black"]} !important; }}
+  [data-baseweb="select"] > div {{ background:{C["card"]} !important; border-color:{C["border"]} !important; border-radius:10px !important; }}
+  [data-baseweb="popover"] {{ background:{C["card"]} !important; }}
+  hr {{ border-color:{C["border"]} !important; }}
+  .tag {{ display:inline-block; background:{C["yellow"]}; color:{C["black"]}; font-size:.68rem;
+          font-weight:800; text-transform:uppercase; letter-spacing:.12em;
+          padding:4px 12px; border-radius:100px; margin-bottom:6px; }}
+  ::-webkit-scrollbar {{ width:5px; }}
+  ::-webkit-scrollbar-thumb {{ background:{C["border"]}; border-radius:3px; }}
+</style>""", unsafe_allow_html=True)
 
-  /* Scrollbar */
-  ::-webkit-scrollbar {{ width: 6px; }}
-  ::-webkit-scrollbar-track {{ background: {BLACK}; }}
-  ::-webkit-scrollbar-thumb {{ background: {BORDER}; border-radius: 3px; }}
-</style>
-""", unsafe_allow_html=True)
-
-PLOTLY_LAYOUT = dict(
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font_color=WHITE,
-    font_family="Inter, system-ui, sans-serif",
-    margin=dict(l=16, r=16, t=40, b=16),
-    colorway=[YELLOW, "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7"],
-    xaxis=dict(gridcolor=BORDER, tickcolor=GRAY, linecolor=BORDER),
-    yaxis=dict(gridcolor=BORDER, tickcolor=GRAY, linecolor=BORDER),
-    legend=dict(bgcolor="rgba(0,0,0,0)", font_color=WHITE),
+# ── Plotly base layout ───────────────────────────────────────────────────────────
+_PLT = dict(
+    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+    font_color=C["white"], font_family="Inter, system-ui, sans-serif",
+    margin=dict(l=16, r=16, t=36, b=16),
+    xaxis=dict(gridcolor=C["border"], tickcolor=C["gray"], linecolor=C["border"], tickfont_size=11),
+    yaxis=dict(gridcolor=C["border"], tickcolor=C["gray"], linecolor=C["border"], tickfont_size=11),
+    legend=dict(bgcolor="rgba(0,0,0,0)", font_color=C["white"], font_size=12),
 )
+
+def plt(**kw) -> dict:
+    return {**_PLT, **kw}
+
+def pie_layout(**kw) -> dict:
+    base = {k: v for k, v in _PLT.items() if k not in ("xaxis", "yaxis")}
+    return {**base, "margin": dict(l=16, r=16, t=16, b=16), **kw}
+
+def tag(label: str) -> str:
+    return f'<div class="tag">{label}</div>'
 
 # ── Data ────────────────────────────────────────────────────────────────────────
 @st.cache_data
-def load_data() -> pd.DataFrame:
+def load() -> pd.DataFrame:
     df = pd.read_csv("data/effectifs_personnels_EN.csv", low_memory=False)
     df["has_etp"] = df["etp_enseignants"].notna()
     df["has_pct"] = df["pct_femmes"].notna()
-    df["annee_de_la_rentree_scolaire"] = df["annee_de_la_rentree_scolaire"].fillna(2024).astype(int)
     return df
 
-df = load_data()
+df = load()
 
 # ── Sidebar ─────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown(f"""
-    <div style="padding:0 0 24px 0">
-      <span style="font-size:1.8rem;font-weight:900;color:{YELLOW};letter-spacing:-0.04em;">DATACK</span>
-      <span style="font-size:0.65rem;color:{GRAY};display:block;margin-top:2px;letter-spacing:0.15em;text-transform:uppercase;">× Éducation Nationale</span>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<div style="padding:16px 0 24px">
+      {logo_img(36, "0")}
+      <span style="font-size:.6rem;color:{C['gray']};display:block;margin-top:8px;
+            letter-spacing:.15em;text-transform:uppercase">× Éducation Nationale</span>
+    </div>""", unsafe_allow_html=True)
 
-    st.markdown("**Filtres**")
+    st.markdown(f"<p style='color:{C['gray']};font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px'>Filtres</p>",
+                unsafe_allow_html=True)
 
-    all_regions = sorted(df["libelle_region"].dropna().unique())
-    sel_regions = st.multiselect("Région", all_regions, placeholder="Toutes les régions")
-
-    all_types = sorted(df["type_etablissement"].dropna().unique())
-    sel_types = st.multiselect("Type d'établissement", all_types, placeholder="Tous les types")
-
+    regions = sorted(df["libelle_region"].dropna().unique())
+    sel_regions = st.multiselect("Région", regions, placeholder="Toutes les régions")
     sel_secteur = st.radio("Secteur", ["Tous", "Public", "Privé"], horizontal=True)
 
     st.divider()
-    st.markdown(f"<span style='color:{GRAY};font-size:0.75rem'>Source : data.education.gouv.fr<br>Rentrée 2024</span>", unsafe_allow_html=True)
+    st.markdown(f"<span style='color:{C['gray']};font-size:.72rem'>Source : data.education.gouv.fr<br>Rentrée 2024</span>",
+                unsafe_allow_html=True)
 
-# ── Apply filters ────────────────────────────────────────────────────────────────
+# ── Filtering ────────────────────────────────────────────────────────────────────
 dff = df.copy()
 if sel_regions:
     dff = dff[dff["libelle_region"].isin(sel_regions)]
-if sel_types:
-    dff = dff[dff["type_etablissement"].isin(sel_types)]
 if sel_secteur != "Tous":
     dff = dff[dff["statut_public_prive"] == sel_secteur]
 
-dff_etp = dff[dff["has_etp"]]
-dff_pct = dff[dff["has_pct"]]
+etp = dff[dff["has_etp"]]   # ~57K — basic count
+pct = dff[dff["has_pct"]]   # ~10K — full % profile (2d degré only)
 
 # ── Header ───────────────────────────────────────────────────────────────────────
-st.markdown(f"""
-<div style="padding: 32px 0 24px 0">
-  <div class="datack-tag">Tableau de bord · Rentrée 2024</div>
-  <h1 style="font-size:2.6rem;margin:8px 0 4px 0;line-height:1.1">
-    Effectifs personnels<br>
-    <span style="color:{YELLOW}">de l'Éducation Nationale</span>
+total_etp = etp["etp_enseignants"].sum()
+
+st.markdown(f"""<div style="padding:28px 0 20px">
+  {tag("Rentrée 2024 · Effectifs enseignants")}
+  <h1 style="font-size:2.4rem;margin:8px 0 4px;line-height:1.1">
+    Les enseignants<br><span style="color:{C['yellow']}">de l'Éducation Nationale</span>
   </h1>
-  <p style="color:{GRAY};font-size:0.95rem;margin:0">
-    {len(dff):,} établissements · {len(dff_etp):,} avec données ETP · {len(dff_pct):,} avec profil complet
+  <p style="color:{C['gray']};font-size:.88rem;margin:0">
+    {len(etp):,} établissements avec données ETP &nbsp;·&nbsp;
+    {total_etp:,.0f} ETP recensés &nbsp;·&nbsp;
+    {len(pct):,} avec profil complet (2d degré)
   </p>
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
 # ── KPIs ─────────────────────────────────────────────────────────────────────────
-k1, k2, k3, k4, k5 = st.columns(5)
+cols = st.columns(5)
+kpis = [
+    ("ETP total enseignants",  f"{total_etp:,.0f}"),
+    ("ETP moyen / école",      f"{etp['etp_enseignants'].mean():.1f}"),
+    ("Femmes enseignantes",    f"{pct['pct_femmes'].mean():.1f}%"          if len(pct) else "—"),
+    ("Non-titulaires",         f"{pct['pct_non_titulaires'].mean():.1f}%"  if len(pct) else "—"),
+    ("Ancienneté ≥ 8 ans",     f"{pct['pct_anciennete_8_ans_plus'].mean():.1f}%" if len(pct) else "—"),
+]
+for col, (label, val) in zip(cols, kpis):
+    col.metric(label, val)
 
-with k1:
-    st.metric("Établissements", f"{len(dff):,}")
-with k2:
-    avg_etp = dff_etp["etp_enseignants"].mean()
-    st.metric("ETP enseignants (moy.)", f"{avg_etp:.1f}" if not pd.isna(avg_etp) else "—")
-with k3:
-    pct_f = dff_pct["pct_femmes"].mean()
-    st.metric("% Femmes enseignantes", f"{pct_f:.1f}%" if not pd.isna(pct_f) else "—")
-with k4:
-    pct_nt = dff_pct["pct_non_titulaires"].mean()
-    st.metric("% Non-titulaires", f"{pct_nt:.1f}%" if not pd.isna(pct_nt) else "—")
-with k5:
-    pct_senior = dff_pct["pct_anciennete_8_ans_plus"].mean()
-    st.metric("% Ancienneté 8+ ans", f"{pct_senior:.1f}%" if not pd.isna(pct_senior) else "—")
-
-st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
 # ── Tabs ─────────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🗺 Géographie", "🏫 Types & Secteurs", "👩‍🏫 Genre & Corps", "⏳ Âge & Ancienneté", "📊 Vue régionale"
-])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Vue d'ensemble", "👩‍🏫 Genre", "📅 Âge & Ancienneté", "🎓 Corps enseignant"])
 
-# ═══════════════════════════════════════════════════════════════
-# TAB 1 — GÉOGRAPHIE
-# ═══════════════════════════════════════════════════════════════
+# ── Tab 1 — Vue d'ensemble ───────────────────────────────────────────────────────
 with tab1:
-    col_map, col_reg = st.columns([3, 2])
-
-    with col_map:
-        st.markdown(f'<div class="datack-tag">Carte</div>', unsafe_allow_html=True)
-        st.markdown("#### Localisation des établissements")
-
-        df_geo = dff[dff["latitude"].notna() & dff["longitude"].notna()].copy()
-
-        # sample for performance
-        sample = df_geo.sample(min(8000, len(df_geo)), random_state=42) if len(df_geo) > 8000 else df_geo
-
-        color_map = {"Public": YELLOW, "Privé": "#FF6B6B"}
-        fig_map = px.scatter_mapbox(
-            sample,
-            lat="latitude", lon="longitude",
-            color="statut_public_prive",
-            color_discrete_map=color_map,
-            hover_name="nom_etablissement",
-            hover_data={"libelle_region": True, "type_etablissement": True,
-                        "latitude": False, "longitude": False},
-            zoom=4.5, center={"lat": 46.5, "lon": 2.5},
-            opacity=0.6,
-            size_max=6,
-        )
-        fig_map.update_layout(
-            mapbox_style="carto-darkmatter",
-            **{k: v for k, v in PLOTLY_LAYOUT.items() if k not in ("xaxis", "yaxis")},
-            height=480,
-            legend_title_text="Secteur",
-        )
-        st.plotly_chart(fig_map, use_container_width=True)
-
-    with col_reg:
-        st.markdown(f'<div class="datack-tag">Régions</div>', unsafe_allow_html=True)
-        st.markdown("#### Établissements par région")
-
-        reg_counts = (
-            dff.groupby("libelle_region")
-            .size()
-            .reset_index(name="count")
-            .sort_values("count", ascending=True)
-            .tail(15)
-        )
-        fig_reg = px.bar(
-            reg_counts, x="count", y="libelle_region",
-            orientation="h",
-            color="count",
-            color_continuous_scale=[[0, "#333"], [1, YELLOW]],
-        )
-        fig_reg.update_layout(**PLOTLY_LAYOUT, height=480, showlegend=False, coloraxis_showscale=False)
-        fig_reg.update_traces(marker_line_width=0)
-        st.plotly_chart(fig_reg, use_container_width=True)
-
-    # Density heatmap
-    st.markdown(f'<div class="datack-tag">Densité</div>', unsafe_allow_html=True)
-    st.markdown("#### ETP moyen par département (établissements avec données)")
-
-    dept_etp = (
-        dff_etp.groupby(["libelle_departement", "code_departement"])
-        .agg(nb=("etp_enseignants", "count"), avg_etp=("etp_enseignants", "mean"))
-        .reset_index()
-        .sort_values("avg_etp", ascending=False)
-        .head(25)
-    )
-    fig_dept = px.bar(
-        dept_etp, x="libelle_departement", y="avg_etp",
-        color="avg_etp",
-        color_continuous_scale=[[0, "#333"], [1, YELLOW]],
-        labels={"avg_etp": "ETP moy.", "libelle_departement": "Département"},
-    )
-    fig_dept.update_layout(**PLOTLY_LAYOUT, height=320, showlegend=False, coloraxis_showscale=False)
-    fig_dept.update_traces(marker_line_width=0)
-    st.plotly_chart(fig_dept, use_container_width=True)
-
-# ═══════════════════════════════════════════════════════════════
-# TAB 2 — TYPES & SECTEURS
-# ═══════════════════════════════════════════════════════════════
-with tab2:
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.markdown(f'<div class="datack-tag">Répartition</div>', unsafe_allow_html=True)
-        st.markdown("#### Par type d'établissement")
-
-        type_counts = dff["type_etablissement"].value_counts().reset_index()
-        type_counts.columns = ["type", "count"]
-
-        fig_type = px.pie(
-            type_counts, names="type", values="count",
-            hole=0.55,
-            color_discrete_sequence=[YELLOW, "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7"],
-        )
-        fig_type.update_traces(textfont_color=WHITE, pull=[0.04] + [0] * (len(type_counts) - 1))
-        fig_type.update_layout(
-            **{k: v for k, v in PLOTLY_LAYOUT.items() if k not in ("xaxis", "yaxis")},
-            height=360,
-        )
-        st.plotly_chart(fig_type, use_container_width=True)
+        st.markdown(tag("Régions"), unsafe_allow_html=True)
+        st.markdown("#### ETP enseignants par région")
+        reg = (etp.groupby("libelle_region")["etp_enseignants"]
+               .agg(total="sum", moy="mean", nb="count").reset_index()
+               .sort_values("total", ascending=True))
+        fig = px.bar(reg, x="total", y="libelle_region", orientation="h",
+                     color="moy", color_continuous_scale=[[0,"#2A2A2A"],[1,C["yellow"]]],
+                     labels={"total":"ETP total","libelle_region":"","moy":"ETP moy."},
+                     hover_data={"nb":True,"moy":":.1f"})
+        fig.update_layout(**plt(height=460, coloraxis_showscale=False))
+        fig.update_traces(marker_line_width=0)
+        st.plotly_chart(fig, use_container_width=True)
 
     with col_b:
-        st.markdown(f'<div class="datack-tag">Secteur</div>', unsafe_allow_html=True)
-        st.markdown("#### Public vs Privé par type")
+        st.markdown(tag("Distribution"), unsafe_allow_html=True)
+        st.markdown("#### ETP par établissement")
+        cap = etp["etp_enseignants"].quantile(0.99)
+        fig = px.histogram(etp[etp["etp_enseignants"] <= cap], x="etp_enseignants", nbins=60,
+                           color_discrete_sequence=[C["yellow"]],
+                           labels={"etp_enseignants":"ETP enseignants"})
+        med, moy = etp["etp_enseignants"].median(), etp["etp_enseignants"].mean()
+        fig.add_vline(x=med, line_dash="dash", line_color=C["teal"],
+                      annotation_text=f"Médiane {med:.1f}", annotation_font_color=C["teal"])
+        fig.add_vline(x=moy, line_dash="dot", line_color=C["white"],
+                      annotation_text=f"Moy. {moy:.1f}", annotation_font_color=C["white"],
+                      annotation_position="top left")
+        fig.update_layout(**plt(height=240, showlegend=False))
+        fig.update_traces(marker_line_width=0)
+        st.plotly_chart(fig, use_container_width=True)
 
-        cross = (
-            dff.groupby(["type_etablissement", "statut_public_prive"])
-            .size()
-            .reset_index(name="count")
-        )
-        fig_cross = px.bar(
-            cross, x="type_etablissement", y="count",
-            color="statut_public_prive",
-            barmode="group",
-            color_discrete_map={"Public": YELLOW, "Privé": "#FF6B6B"},
-            labels={"type_etablissement": "", "count": "Nb établissements", "statut_public_prive": "Secteur"},
-        )
-        fig_cross.update_layout(**PLOTLY_LAYOUT, height=360)
-        fig_cross.update_traces(marker_line_width=0)
-        st.plotly_chart(fig_cross, use_container_width=True)
+        st.markdown(tag("1er vs 2d degré"), unsafe_allow_html=True)
+        st.markdown("#### ETP selon le degré d'enseignement")
+        degre = (etp.groupby("degre")["etp_enseignants"]
+                 .agg(total="sum").reset_index())
+        degre["label"] = degre["degre"].map({"1d":"1er degré (écoles)","2d":"2d degré (collèges/lycées)"})
+        fig = px.bar(degre, x="label", y="total",
+                     color="degre", color_discrete_map={"1d":C["yellow"],"2d":C["teal"]},
+                     text="total", labels={"total":"ETP total","label":"","degre":""})
+        fig.update_traces(marker_line_width=0, texttemplate="%{text:,.0f}",
+                          textposition="outside", textfont_color=C["white"])
+        fig.update_layout(**plt(height=200, showlegend=False, yaxis_visible=False, yaxis_showgrid=False))
+        st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
+    st.markdown(tag("Comparaison régionale"), unsafe_allow_html=True)
+    st.markdown("#### ETP moyen vs nombre d'établissements par région")
+    sc = (etp.groupby("libelle_region")
+          .agg(nb=("etp_enseignants","count"), moy=("etp_enseignants","mean"), tot=("etp_enseignants","sum"))
+          .reset_index())
+    fig = px.scatter(sc, x="nb", y="moy", size="tot", text="libelle_region",
+                     color="moy", color_continuous_scale=[[0,"#2A2A2A"],[1,C["yellow"]]],
+                     labels={"nb":"Nb établissements","moy":"ETP moyen / étab.","tot":"ETP total"},
+                     size_max=55)
+    fig.update_traces(textposition="top center", textfont_color=C["white"], textfont_size=10,
+                      marker_line_color=C["border"], marker_line_width=1)
+    fig.update_layout(**plt(height=380, coloraxis_showscale=False))
+    st.plotly_chart(fig, use_container_width=True)
 
-    col_c, col_d = st.columns(2)
-    with col_c:
-        st.markdown(f'<div class="datack-tag">ETP</div>', unsafe_allow_html=True)
-        st.markdown("#### ETP enseignants moyen par type")
+# ── Tab 2 — Genre ────────────────────────────────────────────────────────────────
+with tab2:
+    if not len(pct):
+        st.info("Données de genre disponibles pour les établissements du 2d degré uniquement.")
+    else:
+        col_c, col_d = st.columns([3, 2])
 
-        etp_type = (
-            dff_etp.groupby("type_etablissement")["etp_enseignants"]
-            .agg(["mean", "median", "count"])
-            .reset_index()
-            .sort_values("mean", ascending=False)
-        )
-        fig_etp_t = go.Figure()
-        fig_etp_t.add_trace(go.Bar(
-            name="Moyenne",
-            x=etp_type["type_etablissement"],
-            y=etp_type["mean"].round(1),
-            marker_color=YELLOW, marker_line_width=0,
+        with col_c:
+            st.markdown(tag("Distribution nationale"), unsafe_allow_html=True)
+            st.markdown("#### % Femmes enseignantes par établissement")
+            moy_f = pct["pct_femmes"].mean()
+            fig = px.histogram(pct, x="pct_femmes", nbins=50,
+                               color_discrete_sequence=[C["yellow"]],
+                               labels={"pct_femmes":"% Femmes"})
+            fig.add_vline(x=moy_f, line_dash="dash", line_color=C["white"],
+                          annotation_text=f"Moy. {moy_f:.1f}%", annotation_font_color=C["white"],
+                          annotation_position="top left")
+            fig.update_layout(**plt(height=300, showlegend=False))
+            fig.update_traces(marker_line_width=0)
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col_d:
+            st.markdown(tag("Résumé"), unsafe_allow_html=True)
+            st.markdown("#### Femmes / Hommes")
+            pct_f = pct["pct_femmes"].mean()
+            fig = go.Figure(go.Pie(
+                labels=["Femmes","Hommes"], values=[pct_f, 100-pct_f],
+                hole=0.62, marker_colors=[C["yellow"],"#2A2A2A"], textinfo="none",
+                hovertemplate="%{label} : %{value:.1f}%<extra></extra>",
+            ))
+            fig.add_annotation(text=f"<b>{pct_f:.0f}%</b>", x=0.5, y=0.52, showarrow=False,
+                               font=dict(size=32, color=C["yellow"]))
+            fig.add_annotation(text="femmes", x=0.5, y=0.36, showarrow=False,
+                               font=dict(size=13, color=C["gray"]))
+            fig.update_layout(**pie_layout(height=300, showlegend=False))
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.divider()
+        st.markdown(tag("Par région"), unsafe_allow_html=True)
+        st.markdown("#### % Femmes par région")
+        reg_f = (pct.groupby("libelle_region")["pct_femmes"]
+                 .mean().round(1).reset_index().sort_values("pct_femmes", ascending=False))
+        avg_f = reg_f["pct_femmes"].mean()
+        fig = go.Figure(go.Bar(
+            x=reg_f["libelle_region"], y=reg_f["pct_femmes"],
+            marker_color=[C["yellow"] if v >= avg_f else C["teal"] for v in reg_f["pct_femmes"]],
+            marker_line_width=0,
+            hovertemplate="%{x} : %{y:.1f}%<extra></extra>",
         ))
-        fig_etp_t.add_trace(go.Bar(
-            name="Médiane",
-            x=etp_type["type_etablissement"],
-            y=etp_type["median"].round(1),
-            marker_color="#4ECDC4", marker_line_width=0,
-        ))
-        fig_etp_t.update_layout(**PLOTLY_LAYOUT, height=320, barmode="group")
-        st.plotly_chart(fig_etp_t, use_container_width=True)
+        fig.add_hline(y=avg_f, line_dash="dash", line_color=C["white"],
+                      annotation_text=f"Moy. {avg_f:.1f}%", annotation_font_color=C["white"])
+        fig.update_layout(**plt(height=300))
+        st.plotly_chart(fig, use_container_width=True)
 
-    with col_d:
-        st.markdown(f'<div class="datack-tag">Nature</div>', unsafe_allow_html=True)
-        st.markdown("#### Top 10 natures d'établissement")
+        st.markdown(tag("Précarité"), unsafe_allow_html=True)
+        st.markdown("#### % Non-titulaires par région")
+        reg_nt = (pct.groupby("libelle_region")["pct_non_titulaires"]
+                  .mean().round(1).reset_index().sort_values("pct_non_titulaires", ascending=True))
+        fig = px.bar(reg_nt, x="pct_non_titulaires", y="libelle_region", orientation="h",
+                     color="pct_non_titulaires",
+                     color_continuous_scale=[[0,"#2A2A2A"],[.5,C["teal"]],[1,C["red"]]],
+                     labels={"pct_non_titulaires":"% Non-titulaires","libelle_region":""})
+        fig.update_layout(**plt(height=400, coloraxis_showscale=False))
+        fig.update_traces(marker_line_width=0)
+        st.plotly_chart(fig, use_container_width=True)
 
-        nat = dff["libelle_nature"].value_counts().head(10).reset_index()
-        nat.columns = ["nature", "count"]
-        nat = nat.sort_values("count", ascending=True)
-
-        fig_nat = px.bar(nat, x="count", y="nature", orientation="h",
-                         color="count",
-                         color_continuous_scale=[[0, "#333"], [1, YELLOW]])
-        fig_nat.update_layout(**PLOTLY_LAYOUT, height=320, showlegend=False, coloraxis_showscale=False)
-        fig_nat.update_traces(marker_line_width=0)
-        st.plotly_chart(fig_nat, use_container_width=True)
-
-# ═══════════════════════════════════════════════════════════════
-# TAB 3 — GENRE & CORPS
-# ═══════════════════════════════════════════════════════════════
+# ── Tab 3 — Âge & Ancienneté ────────────────────────────────────────────────────
 with tab3:
-    if len(dff_pct) == 0:
-        st.info("Pas de données de profil pour la sélection actuelle (réservées aux lycées/collèges).")
+    if not len(etp):
+        st.info("Pas de données ETP pour la sélection.")
     else:
         col_e, col_f = st.columns(2)
 
-        with col_e:
-            st.markdown(f'<div class="datack-tag">Genre</div>', unsafe_allow_html=True)
-            st.markdown("#### Distribution % femmes enseignantes")
+        age_groups = [("Moins de 35 ans","etp_moins_35_ans"), ("35 à 50 ans","etp_35_50_ans"), ("50 ans et plus","etp_50_ans_plus")]
+        anc_groups = [("< 2 ans","etp_anciennete_moins_2_ans"), ("2 à 5 ans","etp_anciennete_2_5_ans"),
+                      ("5 à 8 ans","etp_anciennete_5_8_ans"), ("8 ans et +","etp_anciennete_8_ans_plus")]
 
-            fig_fem = px.histogram(
-                dff_pct, x="pct_femmes", nbins=40,
-                color_discrete_sequence=[YELLOW],
-                labels={"pct_femmes": "% Femmes", "count": "Nb établissements"},
-            )
-            fig_fem.add_vline(
-                x=dff_pct["pct_femmes"].mean(), line_dash="dash",
-                line_color=WHITE, annotation_text=f"Moy. {dff_pct['pct_femmes'].mean():.1f}%",
-                annotation_font_color=WHITE,
-            )
-            fig_fem.update_layout(**PLOTLY_LAYOUT, height=320, showlegend=False)
-            fig_fem.update_traces(marker_line_width=0)
-            st.plotly_chart(fig_fem, use_container_width=True)
+        def stacked_bars(groups, colors, title, tag_label):
+            vals = [(label, etp[col].sum()) for label, col in groups]
+            total = sum(v for _, v in vals if pd.notna(v))
+            fig = go.Figure()
+            for (label, val), color in zip(vals, colors):
+                if pd.notna(val):
+                    fig.add_trace(go.Bar(
+                        name=label, x=[label], y=[val], marker_color=color, marker_line_width=0,
+                        text=f"{val:,.0f}<br>{val/total*100:.1f}%",
+                        textposition="inside", textfont=dict(color=C["black"], size=13),
+                        hovertemplate=f"{label} : %{{y:,.0f}} ETP<extra></extra>",
+                    ))
+            fig.update_layout(**plt(height=320, showlegend=False, yaxis_title="ETP"))
+            return fig
+
+        with col_e:
+            st.markdown(tag("Tranches d'âge"), unsafe_allow_html=True)
+            st.markdown("#### ETP total par tranche d'âge")
+            st.plotly_chart(stacked_bars(age_groups, [C["yellow"], C["teal"], C["red"]], "Âge", "Âge"),
+                            use_container_width=True)
 
         with col_f:
-            st.markdown(f'<div class="datack-tag">Corps</div>', unsafe_allow_html=True)
-            st.markdown("#### Composition moyenne du corps enseignant")
+            st.markdown(tag("Ancienneté"), unsafe_allow_html=True)
+            st.markdown("#### ETP par ancienneté dans l'établissement")
+            st.plotly_chart(stacked_bars(anc_groups, [C["teal"], C["yellow"], C["red"], C["red"]], "Anc", "Anc"),
+                            use_container_width=True)
 
-            corps_labels = ["Agrégés", "Certifiés/PEPs", "PLP", "Autres titulaires", "Non-titulaires"]
-            corps_vals = [
-                dff_pct["pct_agreges"].mean(),
-                dff_pct["pct_certifies"].mean(),
-                dff_etp["etp_plp"].mean() if len(dff_etp) else 0,
-                dff_pct["pct_non_titulaires"].mean() * 0,
-                dff_pct["pct_non_titulaires"].mean(),
-            ]
+        if len(pct):
+            st.divider()
+            col_g, col_h = st.columns(2)
+            pie_colors_age = [C["yellow"], C["teal"], C["red"]]
+            pie_colors_anc = [C["teal"], C["yellow"], C["red"], "#45B7D1"]
 
-            etp_cols_corps = ["etp_agreges", "etp_certifies", "etp_plp", "etp_autres_titulaires", "etp_non_titulaires"]
-            corps_etp_vals = [dff_pct[c].mean() if c in dff_pct.columns else 0 for c in etp_cols_corps]
-            corps_labels_full = ["Agrégés", "Certifiés/PEPs", "PLP", "Autres titulaires", "Non-titulaires"]
+            def pct_pie(labels, values, colors):
+                fig = go.Figure(go.Pie(
+                    labels=labels, values=values, hole=0.55, textinfo="none",
+                    marker_colors=colors,
+                    hovertemplate="%{label} : %{value:.1f}%<extra></extra>",
+                ))
+                fig.update_layout(**pie_layout(height=280,
+                    legend=dict(orientation="v", font_color=C["white"], font_size=12, bgcolor="rgba(0,0,0,0)")))
+                return fig
 
-            fig_corps = px.pie(
-                names=corps_labels_full, values=corps_etp_vals,
-                hole=0.55,
-                color_discrete_sequence=[YELLOW, "#4ECDC4", "#FF6B6B", "#45B7D1", "#96CEB4"],
-            )
-            fig_corps.update_traces(textfont_color=WHITE)
-            fig_corps.update_layout(
-                **{k: v for k, v in PLOTLY_LAYOUT.items() if k not in ("xaxis", "yaxis")},
-                height=320,
-            )
-            st.plotly_chart(fig_corps, use_container_width=True)
+            with col_g:
+                st.markdown(tag("Profil âge"), unsafe_allow_html=True)
+                st.markdown("#### Répartition par âge (2d degré)")
+                st.plotly_chart(pct_pie(
+                    ["Moins de 35 ans","35 à 50 ans","50 ans et plus"],
+                    [pct["pct_moins_35_ans"].mean(), pct["pct_35_50_ans"].mean(), pct["pct_plus_50_ans"].mean()],
+                    pie_colors_age,
+                ), use_container_width=True)
 
-        st.divider()
+            with col_h:
+                st.markdown(tag("Profil ancienneté"), unsafe_allow_html=True)
+                st.markdown("#### Répartition par ancienneté (2d degré)")
+                st.plotly_chart(pct_pie(
+                    ["< 2 ans","2 à 5 ans","5 à 8 ans","8 ans et +"],
+                    [pct["pct_anciennete_moins_2_ans"].mean(), pct["pct_anciennete_2_5_ans"].mean(),
+                     pct["pct_anciennete_5_8_ans"].mean(), pct["pct_anciennete_8_ans_plus"].mean()],
+                    pie_colors_anc,
+                ), use_container_width=True)
 
-        # Gender by region
-        st.markdown(f'<div class="datack-tag">Régions</div>', unsafe_allow_html=True)
-        st.markdown("#### % Femmes enseignantes par région")
-
-        reg_genre = (
-            dff_pct.groupby("libelle_region")["pct_femmes"]
-            .mean().round(1)
-            .reset_index()
-            .sort_values("pct_femmes", ascending=False)
-        )
-        fig_rg = px.bar(
-            reg_genre, x="libelle_region", y="pct_femmes",
-            color="pct_femmes",
-            color_continuous_scale=[[0, "#333"], [0.5, "#4ECDC4"], [1, YELLOW]],
-            labels={"pct_femmes": "% Femmes", "libelle_region": ""},
-        )
-        fig_rg.update_layout(**PLOTLY_LAYOUT, height=300, showlegend=False, coloraxis_showscale=False)
-        fig_rg.update_traces(marker_line_width=0)
-        st.plotly_chart(fig_rg, use_container_width=True)
-
-# ═══════════════════════════════════════════════════════════════
-# TAB 4 — ÂGE & ANCIENNETÉ
-# ═══════════════════════════════════════════════════════════════
+# ── Tab 4 — Corps enseignant ──────────────────────────────────────────────────────
 with tab4:
-    if len(dff_etp) == 0:
-        st.info("Pas de données ETP pour la sélection actuelle.")
+    if not len(pct):
+        st.info("Données de corps disponibles pour les établissements du 2d degré uniquement.")
     else:
-        col_g, col_h = st.columns(2)
+        st.markdown(f'<p style="color:{C["gray"]};font-size:.83rem;margin-bottom:16px">Données pour {len(pct):,} établissements du 2d degré.</p>',
+                    unsafe_allow_html=True)
+        col_i, col_j = st.columns([2, 3])
 
-        with col_g:
-            st.markdown(f'<div class="datack-tag">Âge</div>', unsafe_allow_html=True)
-            st.markdown("#### Pyramide des âges (ETP moyen)")
-
-            age_data = pd.DataFrame({
-                "Tranche": ["< 35 ans", "35–50 ans", "50+ ans"],
-                "ETP moyen": [
-                    dff_etp["etp_moins_35_ans"].mean(),
-                    dff_etp["etp_35_50_ans"].mean(),
-                    dff_etp["etp_50_ans_plus"].mean(),
-                ]
+        with col_i:
+            st.markdown(tag("Composition"), unsafe_allow_html=True)
+            st.markdown("#### ETP moyen par corps")
+            corps = pd.DataFrame({
+                "Corps": ["Agrégés","Certifiés / PEPs","PLP","Autres titulaires","Non-titulaires"],
+                "ETP":   [pct["etp_agreges"].mean(), pct["etp_certifies"].mean(), pct["etp_plp"].mean(),
+                          pct["etp_autres_titulaires"].mean(), pct["etp_non_titulaires"].mean()],
             }).dropna()
+            fig = go.Figure(go.Pie(
+                labels=corps["Corps"], values=corps["ETP"], hole=0.55, textinfo="none",
+                marker_colors=[C["yellow"], C["teal"], C["red"], "#45B7D1", "#FFEAA7"],
+                hovertemplate="%{label} : %{value:.1f} ETP moy.<br>%{percent}<extra></extra>",
+            ))
+            fig.update_layout(**pie_layout(height=320,
+                legend=dict(orientation="v", font_color=C["white"], font_size=12, bgcolor="rgba(0,0,0,0)")))
+            st.plotly_chart(fig, use_container_width=True)
 
-            fig_age = px.bar(
-                age_data, y="Tranche", x="ETP moyen",
-                orientation="h",
-                color="Tranche",
-                color_discrete_sequence=[YELLOW, "#4ECDC4", "#FF6B6B"],
-            )
-            fig_age.update_layout(**PLOTLY_LAYOUT, height=280, showlegend=False)
-            fig_age.update_traces(marker_line_width=0)
-            st.plotly_chart(fig_age, use_container_width=True)
-
-        with col_h:
-            st.markdown(f'<div class="datack-tag">Ancienneté</div>', unsafe_allow_html=True)
-            st.markdown("#### Ancienneté dans l'établissement (ETP moyen)")
-
-            anc_data = pd.DataFrame({
-                "Tranche": ["< 2 ans", "2–5 ans", "5–8 ans", "8+ ans"],
-                "ETP moyen": [
-                    dff_etp["etp_anciennete_moins_2_ans"].mean(),
-                    dff_etp["etp_anciennete_2_5_ans"].mean(),
-                    dff_etp["etp_anciennete_5_8_ans"].mean(),
-                    dff_etp["etp_anciennete_8_ans_plus"].mean(),
-                ]
-            }).dropna()
-
-            fig_anc = px.funnel(
-                anc_data, y="Tranche", x="ETP moyen",
-                color_discrete_sequence=[YELLOW],
-            )
-            fig_anc.update_layout(
-                **{k: v for k, v in PLOTLY_LAYOUT.items() if k not in ("xaxis", "yaxis")},
-                height=280, showlegend=False,
-            )
-            st.plotly_chart(fig_anc, use_container_width=True)
+        with col_j:
+            st.markdown(tag("Comparaison régionale"), unsafe_allow_html=True)
+            st.markdown("#### % Agrégés / % Non-titulaires par région")
+            rc = (pct.groupby("libelle_region")
+                  .agg(pct_agg=("pct_agreges","mean"), pct_nt=("pct_non_titulaires","mean"))
+                  .round(1).reset_index().sort_values("pct_agg", ascending=False))
+            fig = go.Figure([
+                go.Bar(name="% Agrégés", x=rc["libelle_region"], y=rc["pct_agg"],
+                       marker_color=C["yellow"], marker_line_width=0),
+                go.Bar(name="% Non-titulaires", x=rc["libelle_region"], y=rc["pct_nt"],
+                       marker_color=C["red"], marker_line_width=0),
+            ])
+            fig.update_layout(**plt(height=320, barmode="group"))
+            st.plotly_chart(fig, use_container_width=True)
 
         st.divider()
-
-        if len(dff_pct) > 0:
-            col_i, col_j = st.columns(2)
-
-            with col_i:
-                st.markdown(f'<div class="datack-tag">Profil âge</div>', unsafe_allow_html=True)
-                st.markdown("#### Distribution % par tranche d'âge")
-
-                age_pct = pd.DataFrame({
-                    "Tranche": ["< 35 ans", "35–50 ans", "50+ ans"],
-                    "Pct moyen": [
-                        dff_pct["pct_moins_35_ans"].mean(),
-                        dff_pct["pct_35_50_ans"].mean(),
-                        dff_pct["pct_plus_50_ans"].mean(),
-                    ]
-                })
-
-                fig_ap = px.pie(
-                    age_pct, names="Tranche", values="Pct moyen", hole=0.5,
-                    color_discrete_sequence=[YELLOW, "#4ECDC4", "#FF6B6B"],
-                )
-                fig_ap.update_traces(textfont_color=WHITE)
-                fig_ap.update_layout(
-                    **{k: v for k, v in PLOTLY_LAYOUT.items() if k not in ("xaxis", "yaxis")},
-                    height=280,
-                )
-                st.plotly_chart(fig_ap, use_container_width=True)
-
-            with col_j:
-                st.markdown(f'<div class="datack-tag">Profil ancienneté</div>', unsafe_allow_html=True)
-                st.markdown("#### Distribution % par ancienneté")
-
-                anc_pct = pd.DataFrame({
-                    "Tranche": ["< 2 ans", "2–5 ans", "5–8 ans", "8+ ans"],
-                    "Pct moyen": [
-                        dff_pct["pct_anciennete_moins_2_ans"].mean(),
-                        dff_pct["pct_anciennete_2_5_ans"].mean(),
-                        dff_pct["pct_anciennete_5_8_ans"].mean(),
-                        dff_pct["pct_anciennete_8_ans_plus"].mean(),
-                    ]
-                })
-
-                fig_ancp = px.pie(
-                    anc_pct, names="Tranche", values="Pct moyen", hole=0.5,
-                    color_discrete_sequence=[YELLOW, "#4ECDC4", "#FF6B6B", "#45B7D1"],
-                )
-                fig_ancp.update_traces(textfont_color=WHITE)
-                fig_ancp.update_layout(
-                    **{k: v for k, v in PLOTLY_LAYOUT.items() if k not in ("xaxis", "yaxis")},
-                    height=280,
-                )
-                st.plotly_chart(fig_ancp, use_container_width=True)
-
-# ═══════════════════════════════════════════════════════════════
-# TAB 5 — VUE RÉGIONALE
-# ═══════════════════════════════════════════════════════════════
-with tab5:
-    st.markdown(f'<div class="datack-tag">Comparaison</div>', unsafe_allow_html=True)
-    st.markdown("#### Tableau de bord régional comparatif")
-
-    reg_summary = (
-        dff.groupby("libelle_region").agg(
-            nb_etablissements=("identifiant_de_l_etablissement", "count"),
-            nb_avec_etp=("has_etp", "sum"),
-            avg_etp=("etp_enseignants", "mean"),
-            avg_pct_femmes=("pct_femmes", "mean"),
-            avg_pct_non_tit=("pct_non_titulaires", "mean"),
-            avg_pct_moins35=("pct_moins_35_ans", "mean"),
-            avg_pct_50plus=("pct_plus_50_ans", "mean"),
-        )
-        .round(1)
-        .reset_index()
-        .rename(columns={
-            "libelle_region": "Région",
-            "nb_etablissements": "Établissements",
-            "nb_avec_etp": "Avec ETP",
-            "avg_etp": "ETP moy.",
-            "avg_pct_femmes": "% Femmes",
-            "avg_pct_non_tit": "% Non-tit.",
-            "avg_pct_moins35": "% <35 ans",
-            "avg_pct_50plus": "% 50+ ans",
-        })
-        .sort_values("Établissements", ascending=False)
-    )
-
-    st.dataframe(
-        reg_summary,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "% Femmes": st.column_config.ProgressColumn("% Femmes", min_value=0, max_value=100, format="%.1f%%"),
-            "% Non-tit.": st.column_config.ProgressColumn("% Non-tit.", min_value=0, max_value=30, format="%.1f%%"),
-        }
-    )
-
-    st.divider()
-
-    col_k, col_l = st.columns(2)
-
-    with col_k:
-        st.markdown("#### ETP moyen vs % Femmes (par région)")
-
-        scatter_reg = (
-            dff_etp.groupby("libelle_region").agg(
-                avg_etp=("etp_enseignants", "mean"),
-                avg_pct_femmes=("pct_femmes", "mean"),
-                count=("identifiant_de_l_etablissement", "count"),
-            ).reset_index()
-        )
-
-        fig_scatter = px.scatter(
-            scatter_reg,
-            x="avg_etp", y="avg_pct_femmes",
-            size="count", text="libelle_region",
-            color="count",
-            color_continuous_scale=[[0, "#333"], [1, YELLOW]],
-            labels={"avg_etp": "ETP moyen", "avg_pct_femmes": "% Femmes", "count": "Nb étab."},
-        )
-        fig_scatter.update_traces(textposition="top center", textfont_color=WHITE, textfont_size=10)
-        fig_scatter.update_layout(**PLOTLY_LAYOUT, height=380, showlegend=False, coloraxis_showscale=False)
-        st.plotly_chart(fig_scatter, use_container_width=True)
-
-    with col_l:
-        st.markdown("#### % Non-titulaires par région")
-
-        nt_reg = (
-            dff_pct.groupby("libelle_region")["pct_non_titulaires"]
-            .mean().round(1).reset_index()
-            .sort_values("pct_non_titulaires", ascending=True)
-        )
-
-        fig_nt = px.bar(
-            nt_reg, x="pct_non_titulaires", y="libelle_region",
-            orientation="h",
-            color="pct_non_titulaires",
-            color_continuous_scale=[[0, "#333"], [0.5, "#4ECDC4"], [1, "#FF6B6B"]],
-            labels={"pct_non_titulaires": "% Non-tit.", "libelle_region": ""},
-        )
-        fig_nt.update_layout(**PLOTLY_LAYOUT, height=380, showlegend=False, coloraxis_showscale=False)
-        fig_nt.update_traces(marker_line_width=0)
-        st.plotly_chart(fig_nt, use_container_width=True)
+        st.markdown(tag("Titularité"), unsafe_allow_html=True)
+        st.markdown("#### Titulaires vs non-titulaires par région")
+        rt = (pct.groupby("libelle_region")["pct_non_titulaires"]
+              .mean().round(1).reset_index().sort_values("pct_non_titulaires", ascending=False))
+        rt["pct_tit"] = 100 - rt["pct_non_titulaires"]
+        fig = go.Figure([
+            go.Bar(name="Titulaires", y=rt["libelle_region"], x=rt["pct_tit"],
+                   orientation="h", marker_color=C["yellow"], marker_line_width=0,
+                   hovertemplate="%{y} — titulaires : %{x:.1f}%<extra></extra>"),
+            go.Bar(name="Non-titulaires", y=rt["libelle_region"], x=rt["pct_non_titulaires"],
+                   orientation="h", marker_color=C["red"], marker_line_width=0,
+                   hovertemplate="%{y} — non-titulaires : %{x:.1f}%<extra></extra>"),
+        ])
+        fig.update_layout(**plt(height=440, barmode="stack", xaxis_title="% enseignants", yaxis_title=""))
+        st.plotly_chart(fig, use_container_width=True)
 
 # ── Footer ────────────────────────────────────────────────────────────────────────
-st.markdown(f"""
-<div style="text-align:center;padding:40px 0 24px;color:{GRAY};font-size:0.78rem;border-top:1px solid {BORDER};margin-top:32px">
-  Données : Ministère de l'Éducation Nationale — data.education.gouv.fr · Rentrée scolaire 2024<br>
-  <span style="color:{YELLOW};font-weight:800">DATACK</span> × Proxymite · {len(df):,} établissements analysés
-</div>
-""", unsafe_allow_html=True)
+st.markdown(f"""<div style="text-align:center;padding:36px 0 20px;color:{C["gray"]};
+  font-size:.75rem;border-top:1px solid {C["border"]};margin-top:24px">
+  Données : Ministère de l'Éducation Nationale — data.education.gouv.fr · Rentrée 2024<br>
+  <span style="color:{C["yellow"]};font-weight:800">DATACK</span> × Proxymite
+</div>""", unsafe_allow_html=True)
