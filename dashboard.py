@@ -135,6 +135,9 @@ st.markdown(f"""<style>
             padding:4px 12px; border-radius:100px; margin-bottom:6px; }}
   ::-webkit-scrollbar {{ width:5px; }}
   ::-webkit-scrollbar-thumb {{ background:{C["border"]}; border-radius:3px; }}
+  /* Force columns to stay side-by-side — prevent Streamlit responsive stacking */
+  [data-testid="stHorizontalBlock"] {{ flex-wrap:nowrap !important; }}
+  [data-testid="column"] {{ min-width:0 !important; overflow:hidden; }}
 </style>""", unsafe_allow_html=True)
 
 # ── Plotly base layout ───────────────────────────────────────────────────────────
@@ -317,10 +320,11 @@ with tab1:
         else:
             med, moy = etp_a["etp_enseignants"].median(), etp_a["etp_enseignants"].mean()
             fig.add_vline(x=med, line_dash="dash", line_color=C["teal"],
-                          annotation_text=f"Médiane {med:.1f}", annotation_font_color=C["teal"])
+                          annotation_text=f"Médiane {med:.1f}",
+                          annotation_font_color=C["teal"], annotation_position="top right")
             fig.add_vline(x=moy, line_dash="dot", line_color=C["white"],
-                          annotation_text=f"Moy. {moy:.1f}", annotation_font_color=C["white"],
-                          annotation_position="top left")
+                          annotation_text=f"Moy. {moy:.1f}",
+                          annotation_font_color=C["white"], annotation_position="bottom right")
             fig.update_layout(**plt(height=240, showlegend=False))
         st.plotly_chart(fig, use_container_width=True)
 
