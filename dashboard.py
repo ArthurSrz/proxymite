@@ -248,16 +248,14 @@ def _kpi_rows(etp, pct, label_suffix=""):
     ]
 
 if ab_mode and etp_b is not None:
-    col_hdr_a, col_hdr_b = st.columns(2)
-    col_hdr_a.markdown(f"<p style='color:{C['yellow']};font-weight:800;font-size:.8rem;text-transform:uppercase;letter-spacing:.1em'>Groupe A — {_scope_label(etp_a, pct_a)}</p>", unsafe_allow_html=True)
-    col_hdr_b.markdown(f"<p style='color:{C['teal']};font-weight:800;font-size:.8rem;text-transform:uppercase;letter-spacing:.1em'>Groupe B — {_scope_label(etp_b, pct_b)}</p>", unsafe_allow_html=True)
-    kpis_a = _kpi_rows(etp_a, pct_a, " (A)")
-    kpis_b = _kpi_rows(etp_b, pct_b, " (B)")
-    cols_a = col_hdr_a.columns(5)
-    cols_b = col_hdr_b.columns(5)
-    for col, (label, val) in zip(cols_a, kpis_a):
+    # Two rows of 5 — one per group — labels without suffix to keep cards readable
+    st.markdown(f"<p style='color:{C['yellow']};font-weight:800;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px'>Groupe A — {_scope_label(etp_a, pct_a)}</p>", unsafe_allow_html=True)
+    cols_a = st.columns(5)
+    for col, (label, val) in zip(cols_a, _kpi_rows(etp_a, pct_a)):
         col.metric(label, val)
-    for col, (label, val) in zip(cols_b, kpis_b):
+    st.markdown(f"<p style='color:{C['teal']};font-weight:800;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;margin:10px 0 6px'>Groupe B — {_scope_label(etp_b, pct_b)}</p>", unsafe_allow_html=True)
+    cols_b = st.columns(5)
+    for col, (label, val) in zip(cols_b, _kpi_rows(etp_b, pct_b)):
         col.metric(label, val)
 else:
     cols = st.columns(5)
