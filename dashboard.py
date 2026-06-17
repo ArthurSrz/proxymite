@@ -681,7 +681,55 @@ with tab5:
             st.divider()
             st.markdown(f"<p style='color:{C['gray']};font-size:.8rem'>Comparaison avec l'académie de <b style='color:{C['white']}'>{acad}</b> ({len(peer):,} étab.)</p>", unsafe_allow_html=True)
 
-            # TODO(human): build the comparison radar or bar chart showing this school vs académie average
+            # Normalize all metrics to académie mean so axes are comparable (1.0 = average)
+            metrics = ["ETP enseignants", "% Femmes", "% Non-titulaires", "% Anc. ≥8 ans"]
+            acad_means = [
+                peer["etp_enseignants"].mean(),
+                peer_pct["pct_femmes"].mean() if len(peer_pct) else None,
+                peer_pct["pct_non_titulaires"].mean() if len(peer_pct) else None,
+                peer_pct["pct_anciennete_8_ans_plus"].mean() if len(peer_pct) else None,
+            ]
+            school_vals = [
+                row["etp_enseignants"] if has_etp_row else None,
+                row["pct_femmes"] if has_pct_row else None,
+                row["pct_non_titulaires"] if has_pct_row else None,
+                row["pct_anciennete_8_ans_plus"] if has_pct_row else None,
+            ]
+            # Keep only axes where both values exist
+            valid = [(m, sv, am) for m, sv, am in zip(metrics, school_vals, acad_means)
+                     if sv is not None and am is not None and am > 0]
+            if valid:
+                theta, school_r, acad_r = zip(*[(m, sv / am, 1.0) for m, sv, am in valid])
+                theta = list(theta) + [theta[0]]  # close the polygon
+                school_r = list(school_r) + [school_r[0]]
+                acad_r   = [1.0] * len(theta)
+                radar_fig = go.Figure()
+                radar_fig.add_trace(go.Scatterpolar(
+                    r=acad_r, theta=theta, fill="toself", name=f"Académie {acad}",
+                    line_color=C["teal"], fillcolor=f"{C['teal']}22",
+                ))
+                radar_fig.add_trace(go.Scatterpolar(
+                    r=school_r, theta=theta, fill="toself", name=row["nom_etablissement"],
+                    line_color=C["yellow"], fillcolor=f"{C['yellow']}33",
+                ))
+                radar_fig.update_layout(
+                    polar=dict(
+                        bgcolor=C["card"],
+                        radialaxis=dict(visible=True, range=[0, 2], tickvals=[0.5, 1, 1.5],
+                                        ticktext=["0.5×", "moy.", "1.5×"],
+                                        gridcolor=C["border"], linecolor=C["border"],
+                                        tickfont_color=C["gray"]),
+                        angularaxis=dict(gridcolor=C["border"], linecolor=C["border"],
+                                         tickfont_color=C["white"]),
+                    ),
+                    showlegend=True, height=380,
+                    paper_bgcolor="rgba(0,0,0,0)", font_color=C["white"],
+                    legend=dict(bgcolor="rgba(0,0,0,0)", font_color=C["white"]),
+                    margin=dict(l=60, r=60, t=40, b=40),
+                )
+                st.plotly_chart(radar_fig, use_container_width=True)
+
+
 
             ctx_cols = st.columns(4)
             ctx_cols[0].metric("ETP moy. académie",    f"{peer['etp_enseignants'].mean():.1f}",
