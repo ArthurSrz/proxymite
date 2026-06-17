@@ -72,19 +72,23 @@ def _login_wall() -> None:
       [data-testid="stImage"] img {{ margin:0 auto; display:block; max-height:52px; width:auto; }}
     </style>""", unsafe_allow_html=True)
 
-    # Logo via st.image (avoids embedding base64 inside markdown HTML)
-    if _logo_path.exists():
-        st.image(str(_logo_path), width=160)
-    else:
-        st.markdown(f"<div style='text-align:center;padding-top:80px'><span style='font-size:2rem;font-weight:900;color:{C['yellow']}'>DATACK</span></div>",
+    # Logo — centered via columns trick (st.image ignores CSS text-align)
+    st.markdown("<div style='height:60px'></div>", unsafe_allow_html=True)
+    _, mid, _ = st.columns([1, 2, 1])
+    with mid:
+        if _logo_path.exists():
+            st.image(str(_logo_path), use_container_width=True)
+        else:
+            st.markdown(f"<div style='text-align:center'><span style='font-size:2rem;font-weight:900;color:{C['yellow']}'>DATACK</span></div>",
+                        unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:center;color:{C['gray']};font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;margin:6px 0 32px'>× Éducation Nationale</p>",
                     unsafe_allow_html=True)
 
-    st.markdown(f"<p style='text-align:center;color:{C['gray']};font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;margin:4px 0 32px'>× Éducation Nationale</p>",
-                unsafe_allow_html=True)
-
     with st.form("login", border=False):
-        pwd = st.text_input("", type="password", placeholder="Mot de passe…")
-        submitted = st.form_submit_button("Accéder au tableau de bord")
+        _, mid2, _ = st.columns([1, 2, 1])
+        with mid2:
+            pwd = st.text_input("", type="password", placeholder="Mot de passe…")
+            submitted = st.form_submit_button("Accéder au tableau de bord")
 
     if submitted:
         if _check_password(pwd):
@@ -93,8 +97,10 @@ def _login_wall() -> None:
         else:
             st.error("Mot de passe incorrect.")
 
-    st.markdown(f"<p style='text-align:center;color:{C['gray']};font-size:.72rem;margin-top:24px'>Accès restreint · Rentrée 2024</p>",
-                unsafe_allow_html=True)
+    _, mid3, _ = st.columns([1, 2, 1])
+    with mid3:
+        st.markdown(f"<p style='text-align:center;color:{C['gray']};font-size:.72rem;margin-top:24px'>Accès restreint · Rentrée 2024</p>",
+                    unsafe_allow_html=True)
 
 if not st.session_state.get("ok"):
     _login_wall()
