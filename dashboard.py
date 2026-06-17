@@ -48,6 +48,7 @@ def _check_password(candidate: str) -> bool:
     return h(candidate) == h(correct)
 
 def _login_wall() -> None:
+    # CSS only — no HTML content mixed in the same markdown call
     st.markdown(f"""<style>
       html, body, .stApp {{ background-color:{C["black"]} !important; }}
       .stAppHeader, header[data-testid="stHeader"] {{ display:none !important; }}
@@ -66,13 +67,20 @@ def _login_wall() -> None:
         font-weight:800 !important; padding:12px !important; margin-top:8px;
       }}
       [data-testid="stForm"] {{ border:none !important; padding:0 !important; }}
-    </style>
-    <div style="text-align:center;padding:80px 0 40px">
-      {logo_img(48)}
-      <p style="color:{C["gray"]};font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;margin:10px 0 0">
-        × Éducation Nationale
-      </p>
-    </div>""", unsafe_allow_html=True)
+      /* Center the logo image Streamlit renders */
+      [data-testid="stImage"] {{ text-align:center; margin:80px auto 8px; display:block; }}
+      [data-testid="stImage"] img {{ margin:0 auto; display:block; max-height:52px; width:auto; }}
+    </style>""", unsafe_allow_html=True)
+
+    # Logo via st.image (avoids embedding base64 inside markdown HTML)
+    if _logo_path.exists():
+        st.image(str(_logo_path), width=160)
+    else:
+        st.markdown(f"<div style='text-align:center;padding-top:80px'><span style='font-size:2rem;font-weight:900;color:{C['yellow']}'>DATACK</span></div>",
+                    unsafe_allow_html=True)
+
+    st.markdown(f"<p style='text-align:center;color:{C['gray']};font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;margin:4px 0 32px'>× Éducation Nationale</p>",
+                unsafe_allow_html=True)
 
     with st.form("login", border=False):
         pwd = st.text_input("", type="password", placeholder="Mot de passe…")
