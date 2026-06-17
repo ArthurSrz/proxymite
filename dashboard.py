@@ -247,16 +247,26 @@ def _kpi_rows(etp, pct, label_suffix=""):
         (f"Ancienneté ≥8 ans{label_suffix}", f"{pct['pct_anciennete_8_ans_plus'].mean():.1f}%" if len(pct) else "—"),
     ]
 
+def _kpi_html_row(kpis, color, header):
+    cards = "".join(f"""
+      <div style="background:{C['card']};border:1px solid {C['border']};border-radius:16px;
+                  padding:20px 24px;flex:1;min-width:0;overflow:hidden">
+        <p style="color:{C['gray']};font-size:.72rem;text-transform:uppercase;
+                  letter-spacing:.1em;margin:0 0 8px;white-space:nowrap;
+                  overflow:hidden;text-overflow:ellipsis">{label}</p>
+        <p style="color:{color};font-size:1.9rem;font-weight:800;margin:0">{val}</p>
+      </div>""" for label, val in kpis)
+    return f"""
+      <p style="color:{color};font-weight:800;font-size:.75rem;text-transform:uppercase;
+                letter-spacing:.1em;margin:12px 0 6px">{header}</p>
+      <div style="display:flex;gap:12px;margin-bottom:4px">{cards}</div>"""
+
 if ab_mode and etp_b is not None:
-    # Two rows of 5 — one per group — labels without suffix to keep cards readable
-    st.markdown(f"<p style='color:{C['yellow']};font-weight:800;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px'>Groupe A — {_scope_label(etp_a, pct_a)}</p>", unsafe_allow_html=True)
-    cols_a = st.columns(5)
-    for col, (label, val) in zip(cols_a, _kpi_rows(etp_a, pct_a)):
-        col.metric(label, val)
-    st.markdown(f"<p style='color:{C['teal']};font-weight:800;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;margin:10px 0 6px'>Groupe B — {_scope_label(etp_b, pct_b)}</p>", unsafe_allow_html=True)
-    cols_b = st.columns(5)
-    for col, (label, val) in zip(cols_b, _kpi_rows(etp_b, pct_b)):
-        col.metric(label, val)
+    st.markdown(
+        _kpi_html_row(_kpi_rows(etp_a, pct_a), C["yellow"], f"Groupe A — {_scope_label(etp_a, pct_a)}") +
+        _kpi_html_row(_kpi_rows(etp_b, pct_b), C["teal"],   f"Groupe B — {_scope_label(etp_b, pct_b)}"),
+        unsafe_allow_html=True,
+    )
 else:
     cols = st.columns(5)
     for col, (label, val) in zip(cols, _kpi_rows(etp_a, pct_a)):
