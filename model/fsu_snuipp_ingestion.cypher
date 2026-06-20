@@ -42,7 +42,7 @@ MERGE (n:CercleProximite {nom:r.nom}) SET n += {rang:r.rang, role_attendu:r.role
 // Objectifs d'action (proximité multidimensionnelle — CR kick-off)
 UNWIND [
   {nom:'voter',       description:'Aller voter aux élections professionnelles'},
-  {nom:'voter_orga',  description:'Voter pour l''organisation'},
+  {nom:'voter_orga',  description:'Voter pour l\'organisation'},
   {nom:'adherer',     description:'Adhérer au syndicat'},
   {nom:'mobiliser',   description:'Se mobiliser sur une campagne'},
   {nom:'relayer',     description:'Relayer localement les messages'},

@@ -281,13 +281,12 @@ def build_geo_records(etabs):
 # --------------------------------------------------------------------------- #
 # CYPHER
 # --------------------------------------------------------------------------- #
-# NB : le modèle canonique (Aura/Enterprise) utilise IS NODE KEY ; on retombe sur
-# IS UNIQUE pour rester compatible avec Neo4j Community (instance locale).
+# Contraintes propres à l'extension « effectifs » : Etablissement (nœud parapluie) et
+# Region. Les autres labels (Contact, Ecole, Departement, Academie...) sont possédés par
+# le schéma canonique model/fsu_snuipp_ingestion.cypher (chargé via load_model.py).
+# IS UNIQUE convient en Community ; sur Enterprise/Aura le schéma canonique utilise NODE KEY.
 CONSTRAINTS = [
     "CREATE CONSTRAINT Etablissement_uai IF NOT EXISTS FOR (n:Etablissement) REQUIRE n.code_uai IS UNIQUE",
-    "CREATE CONSTRAINT Contact_id IF NOT EXISTS FOR (n:Contact) REQUIRE n.id_contact IS UNIQUE",
-    "CREATE CONSTRAINT Departement_code IF NOT EXISTS FOR (n:Departement) REQUIRE n.code_dept IS UNIQUE",
-    "CREATE CONSTRAINT Academie_nom IF NOT EXISTS FOR (n:Academie) REQUIRE n.nom IS UNIQUE",
     "CREATE CONSTRAINT Region_code IF NOT EXISTS FOR (n:Region) REQUIRE n.code_region IS UNIQUE",
 ]
 
