@@ -20,6 +20,7 @@ Usage :
 import math
 import os
 import sys
+from collections import defaultdict
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -150,7 +151,9 @@ def _etablissement_record(row, uai, degre, effectif):
         "code_postal": _str(row.get("code_postal")),
         "code_departement": _str(row.get("code_departement")),
         "libelle_departement": _str(row.get("libelle_departement")),
+        "code_academie": _str(row.get("code_academie")),
         "libelle_academie": _str(row.get("libelle_academie")),
+        "code_region": _str(row.get("code_region")),
         "libelle_region": _str(row.get("libelle_region")),
         "latitude": _num(row.get("latitude")),
         "longitude": _num(row.get("longitude")),
@@ -224,6 +227,57 @@ def build_records(limit=None):
     return etabs, contacts, edges
 
 
+def build_geo_records(etabs):
+    """Dérive la maille géographique (Departement -> Academie -> Region) des établissements.
+
+    Les liens inter-niveaux sont rendus FONCTIONNELS (une seule cible par source) en gardant
+    la cible dominante (plus gros effectif cumulé). Indispensable pour que les rollups soient
+    un vrai arbre : une académie à cheval sur 2 régions (ex. Guadeloupe / TOM) double-compterait
+    sinon les effectifs. Les nœuds Region ne sont créés que pour les régions effectivement
+    rattachées (pas de nœud orphelin).
+    """
+    dep_nom, acad_code, region_nom = {}, {}, {}
+    etab_dept = []
+    dept_acad_w, acad_region_w = defaultdict(float), defaultdict(float)
+
+    for e in etabs:
+        cd, ca, cr, eff = e["code_departement"], e["libelle_academie"], e["code_region"], e["effectif"]
+        if cd:
+            dep_nom.setdefault(cd, e["libelle_departement"])
+            etab_dept.append({"sourceId": e["code_uai"], "targetId": cd, "source": "open_data_EN"})
+        if ca:
+            acad_code.setdefault(ca, e["code_academie"])
+        if cr:
+            region_nom.setdefault(cr, e["libelle_region"])
+        if cd and ca:
+            dept_acad_w[(cd, ca)] += eff
+        if ca and cr:
+            acad_region_w[(ca, cr)] += eff
+
+    def dominant(weights):
+        """Pour chaque source, garde la cible au plus gros effectif cumulé."""
+        best = {}
+        for (src, tgt), w in weights.items():
+            if src not in best or w > best[src][1]:
+                best[src] = (tgt, w)
+        return best
+
+    da, ar = dominant(dept_acad_w), dominant(acad_region_w)
+    used_regions = {tgt for tgt, _ in ar.values()}
+
+    return {
+        "departements": [{"code_dept": cd, "nom": dep_nom[cd], "est_drom": cd.startswith("97")}
+                         for cd in sorted(dep_nom)],
+        "academies": [{"nom": a, "code_academie": acad_code[a],
+                       "region": region_nom.get(ar[a][0]) if a in ar else None}
+                      for a in sorted(acad_code)],
+        "regions": [{"code_region": cr, "nom": region_nom[cr]} for cr in sorted(used_regions)],
+        "etab_dept": etab_dept,
+        "dept_acad": [{"sourceId": s, "targetId": t, "source": "open_data_EN"} for s, (t, _) in sorted(da.items())],
+        "acad_region": [{"sourceId": s, "targetId": t, "source": "open_data_EN"} for s, (t, _) in sorted(ar.items())],
+    }
+
+
 # --------------------------------------------------------------------------- #
 # CYPHER
 # --------------------------------------------------------------------------- #
@@ -232,6 +286,9 @@ def build_records(limit=None):
 CONSTRAINTS = [
     "CREATE CONSTRAINT Etablissement_uai IF NOT EXISTS FOR (n:Etablissement) REQUIRE n.code_uai IS UNIQUE",
     "CREATE CONSTRAINT Contact_id IF NOT EXISTS FOR (n:Contact) REQUIRE n.id_contact IS UNIQUE",
+    "CREATE CONSTRAINT Departement_code IF NOT EXISTS FOR (n:Departement) REQUIRE n.code_dept IS UNIQUE",
+    "CREATE CONSTRAINT Academie_nom IF NOT EXISTS FOR (n:Academie) REQUIRE n.nom IS UNIQUE",
+    "CREATE CONSTRAINT Region_code IF NOT EXISTS FOR (n:Region) REQUIRE n.code_region IS UNIQUE",
 ]
 
 ETAB_CYPHER = """
@@ -239,7 +296,8 @@ UNWIND $records AS rec
 MERGE (e:Etablissement {code_uai: rec.code_uai})
 SET e += {nom: rec.nom, type_etablissement: rec.type_etablissement, secteur: rec.secteur,
           commune: rec.commune, code_postal: rec.code_postal, code_departement: rec.code_departement,
-          libelle_departement: rec.libelle_departement, libelle_academie: rec.libelle_academie,
+          libelle_departement: rec.libelle_departement, code_academie: rec.code_academie,
+          libelle_academie: rec.libelle_academie, code_region: rec.code_region,
           libelle_region: rec.libelle_region, latitude: rec.latitude, longitude: rec.longitude,
           degre: rec.degre, nb_eleves: rec.nb_eleves, effectif: rec.effectif, source: rec.source}
 FOREACH (_ IN CASE WHEN rec.is_1d THEN [1] ELSE [] END | SET e:Ecole)
@@ -262,6 +320,59 @@ MERGE (c)-[r:TRAVAILLE_DANS]->(e)
 SET r += {source: rec.source, quotite: rec.quotite, annee: rec.annee}
 """
 
+# --- Maille géographique : Departement -> Academie -> Region -------------------
+DEPT_CYPHER = """
+UNWIND $records AS rec
+MERGE (d:Departement {code_dept: rec.code_dept})
+SET d += {nom: rec.nom, est_drom: rec.est_drom}
+"""
+
+ACAD_CYPHER = """
+UNWIND $records AS rec
+MERGE (a:Academie {nom: rec.nom})
+SET a += {code_academie: rec.code_academie, region: rec.region}
+"""
+
+REGION_CYPHER = """
+UNWIND $records AS rec
+MERGE (r:Region {code_region: rec.code_region})
+SET r += {nom: rec.nom}
+"""
+
+ETAB_DEPT_CYPHER = """
+UNWIND $records AS rec
+MATCH (e:Etablissement {code_uai: rec.sourceId})
+MATCH (d:Departement {code_dept: rec.targetId})
+MERGE (e)-[r:DANS_DEPARTEMENT]->(d)
+SET r += {source: rec.source}
+"""
+
+DEPT_ACAD_CYPHER = """
+UNWIND $records AS rec
+MATCH (d:Departement {code_dept: rec.sourceId})
+MATCH (a:Academie {nom: rec.targetId})
+MERGE (d)-[r:DEPARTEMENT_DANS_ACADEMIE]->(a)
+SET r += {source: rec.source}
+"""
+
+ACAD_REGION_CYPHER = """
+UNWIND $records AS rec
+MATCH (a:Academie {nom: rec.sourceId})
+MATCH (r:Region {code_region: rec.targetId})
+MERGE (a)-[rel:ACADEMIE_DANS_REGION]->(r)
+SET rel += {source: rec.source}
+"""
+
+# Rollups effectif : agrégation montante (étab -> dept -> académie -> région).
+GEO_ROLLUPS = [
+    "MATCH (e:Etablissement)-[:DANS_DEPARTEMENT]->(d:Departement) "
+    "WITH d, sum(e.effectif) AS eff SET d.effectif = eff",
+    "MATCH (d:Departement)-[:DEPARTEMENT_DANS_ACADEMIE]->(a:Academie) "
+    "WITH a, sum(d.effectif) AS eff SET a.effectif = eff",
+    "MATCH (a:Academie)-[:ACADEMIE_DANS_REGION]->(r:Region) "
+    "WITH r, sum(a.effectif) AS eff SET r.effectif = eff",
+]
+
 
 def _run_batches(driver, db, cypher, records, label):
     for i in range(0, len(records), BATCH):
@@ -269,6 +380,19 @@ def _run_batches(driver, db, cypher, records, label):
         driver.execute_query(cypher, records=chunk, database_=db)
         print(f"  {label}: {min(i + BATCH, len(records))}/{len(records)}", end="\r")
     print(f"  {label}: {len(records)}/{len(records)} ✓")
+
+
+def load_geo(driver, db, geo):
+    """Charge la maille géographique (nœuds + liens) puis agrège les effectifs montants."""
+    _run_batches(driver, db, DEPT_CYPHER, geo["departements"], "Departement")
+    _run_batches(driver, db, ACAD_CYPHER, geo["academies"], "Academie")
+    _run_batches(driver, db, REGION_CYPHER, geo["regions"], "Region")
+    _run_batches(driver, db, ETAB_DEPT_CYPHER, geo["etab_dept"], "DANS_DEPARTEMENT")
+    _run_batches(driver, db, DEPT_ACAD_CYPHER, geo["dept_acad"], "DEPARTEMENT_DANS_ACADEMIE")
+    _run_batches(driver, db, ACAD_REGION_CYPHER, geo["acad_region"], "ACADEMIE_DANS_REGION")
+    for rollup in GEO_ROLLUPS:
+        driver.execute_query(rollup, database_=db)
+    print("  Rollups effectif (dept/académie/région) ✓")
 
 
 def main():
@@ -280,7 +404,10 @@ def main():
 
     print(f"Construction des records depuis {CSV_PATH}" + (f" (limit={limit})" if limit else ""))
     etabs, contacts, edges = build_records(limit)
+    geo = build_geo_records(etabs)
     print(f"  -> {len(etabs)} établissements, {len(contacts)} contacts dérivés, {len(edges)} relations")
+    print(f"  -> géo : {len(geo['departements'])} départements, {len(geo['academies'])} académies, "
+          f"{len(geo['regions'])} régions")
 
     with GraphDatabase.driver(uri, auth=auth) as driver:
         driver.verify_connectivity()
@@ -291,6 +418,7 @@ def main():
         _run_batches(driver, db, ETAB_CYPHER, etabs, "Etablissement")
         _run_batches(driver, db, CONTACT_CYPHER, contacts, "Contact")
         _run_batches(driver, db, EDGE_CYPHER, edges, "TRAVAILLE_DANS")
+        load_geo(driver, db, geo)
     print("Terminé.")
 
 

@@ -124,7 +124,9 @@ class Etablissement(BaseModel):
     code_postal: Optional[str] = None
     code_departement: Optional[str] = None
     libelle_departement: Optional[str] = None
+    code_academie: Optional[str] = None
     libelle_academie: Optional[str] = None
+    code_region: Optional[str] = None
     libelle_region: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -192,7 +194,18 @@ class Academie(BaseModel):
     node_label: ClassVar[str] = "Academie"
 
     nom: str
+    code_academie: Optional[str] = None
     region: Optional[str] = None
+    effectif: Optional[int] = None    # rollup : somme des effectifs des départements
+
+
+class Region(BaseModel):
+    """Région administrative (19) — niveau géographique le plus haut (open data EN)."""
+    node_label: ClassVar[str] = "Region"
+
+    code_region: str
+    nom: Optional[str] = None
+    effectif: Optional[int] = None    # rollup : somme des effectifs des académies
 
 
 class Theme(BaseModel):
@@ -350,11 +363,29 @@ class SectionCouvre(BaseModel):
     targetId: str   # Departement.code_dept
 
 
+class DansDepartement(BaseModel):
+    """Établissement rattaché à son département (open data EN ; pas de circonscription dans la source)."""
+    relationship_type: ClassVar[str] = "DANS_DEPARTEMENT"
+    pattern: ClassVar[str] = "(:Etablissement)-[:DANS_DEPARTEMENT]->(:Departement)"
+    sourceId: str   # Etablissement.code_uai
+    targetId: str   # Departement.code_dept
+    source: Optional[str] = None
+
+
 class DepartementDansAcademie(BaseModel):
     relationship_type: ClassVar[str] = "DEPARTEMENT_DANS_ACADEMIE"
     pattern: ClassVar[str] = "(:Departement)-[:DEPARTEMENT_DANS_ACADEMIE]->(:Academie)"
     sourceId: str   # Departement.code_dept
     targetId: str   # Academie.nom
+    source: Optional[str] = None
+
+
+class AcademieDansRegion(BaseModel):
+    relationship_type: ClassVar[str] = "ACADEMIE_DANS_REGION"
+    pattern: ClassVar[str] = "(:Academie)-[:ACADEMIE_DANS_REGION]->(:Region)"
+    sourceId: str   # Academie.nom
+    targetId: str   # Region.code_region
+    source: Optional[str] = None
 
 
 class InteressePar(BaseModel):

@@ -51,7 +51,46 @@ MERGE (c)-[r:TRAVAILLE_DANS]->(e)
 SET r += {source: rec.source, quotite: rec.quotite, annee: rec.annee};
 
 // ---------------------------------------------------------------------
-// 5. VÉRIFICATIONS
+// 5. MAILLE GÉOGRAPHIQUE  Etablissement -> Departement -> Academie -> Region
+//    (pas de circonscription dans la source : lien direct étab -> département)
+// ---------------------------------------------------------------------
+CREATE CONSTRAINT Departement_code IF NOT EXISTS FOR (n:Departement) REQUIRE n.code_dept   IS UNIQUE;
+CREATE CONSTRAINT Academie_nom     IF NOT EXISTS FOR (n:Academie)    REQUIRE n.nom         IS UNIQUE;
+CREATE CONSTRAINT Region_code      IF NOT EXISTS FOR (n:Region)      REQUIRE n.code_region IS UNIQUE;
+
+// Nœuds  (rec = {code_dept, nom, est_drom} | {nom, code_academie, region} | {code_region, nom})
+UNWIND $records AS rec
+MERGE (d:Departement {code_dept: rec.code_dept}) SET d += {nom: rec.nom, est_drom: rec.est_drom};
+
+UNWIND $records AS rec
+MERGE (a:Academie {nom: rec.nom}) SET a += {code_academie: rec.code_academie, region: rec.region};
+
+UNWIND $records AS rec
+MERGE (r:Region {code_region: rec.code_region}) SET r += {nom: rec.nom};
+
+// Relations inter-niveaux  (rec = {sourceId, targetId, source})
+UNWIND $records AS rec
+MATCH (e:Etablissement {code_uai: rec.sourceId}) MATCH (d:Departement {code_dept: rec.targetId})
+MERGE (e)-[r:DANS_DEPARTEMENT]->(d) SET r += {source: rec.source};
+
+UNWIND $records AS rec
+MATCH (d:Departement {code_dept: rec.sourceId}) MATCH (a:Academie {nom: rec.targetId})
+MERGE (d)-[r:DEPARTEMENT_DANS_ACADEMIE]->(a) SET r += {source: rec.source};
+
+UNWIND $records AS rec
+MATCH (a:Academie {nom: rec.sourceId}) MATCH (r:Region {code_region: rec.targetId})
+MERGE (a)-[rel:ACADEMIE_DANS_REGION]->(r) SET rel += {source: rec.source};
+
+// Rollups effectif (agrégation montante)
+MATCH (e:Etablissement)-[:DANS_DEPARTEMENT]->(d:Departement)
+WITH d, sum(e.effectif) AS eff SET d.effectif = eff;
+MATCH (d:Departement)-[:DEPARTEMENT_DANS_ACADEMIE]->(a:Academie)
+WITH a, sum(d.effectif) AS eff SET a.effectif = eff;
+MATCH (a:Academie)-[:ACADEMIE_DANS_REGION]->(r:Region)
+WITH r, sum(a.effectif) AS eff SET r.effectif = eff;
+
+// ---------------------------------------------------------------------
+// 6. VÉRIFICATIONS
 // ---------------------------------------------------------------------
 // Invariant : effectif == nombre de contacts rattachés (doit renvoyer 0 ligne)
 // MATCH (e:Etablissement)
