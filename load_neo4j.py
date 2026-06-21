@@ -30,6 +30,10 @@ CSV_PATH = os.path.join(os.path.dirname(__file__), "data", "effectifs_personnels
 ANNEE = 2024
 BATCH = 5000
 
+# Périmètre : premier degré uniquement (électorat SNUipp = professeurs des écoles).
+# Pour réintégrer le second degré, ajouter "2d" (la logique 2d est déjà gérée plus bas).
+DEGRES = ("1d",)
+
 # Décomposition de etp_enseignants en corps (2nd degré uniquement ; somme == etp_enseignants).
 CORPS_2D = [
     ("Agrégés", "etp_agreges"),
@@ -202,7 +206,7 @@ def build_records(limit=None):
     Ne garde que les degrés 1d/2d ayant round(etp_enseignants) >= 1 (sinon nœud orphelin).
     """
     df = pd.read_csv(CSV_PATH, low_memory=False)
-    df = df[df["degre"].isin(["1d", "2d"])]
+    df = df[df["degre"].isin(DEGRES)]
 
     etabs, contacts, edges = [], [], []
     for row in df.to_dict("records"):
