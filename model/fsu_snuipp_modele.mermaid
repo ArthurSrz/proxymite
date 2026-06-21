@@ -1,0 +1,93 @@
+graph TD
+%% Noeuds
+Contact("Contact<br/>id_contact: STRING | KEY<br/>id_snupers: STRING<br/>statut_adhesion: STRING<br/>grade: STRING<br/>anciennete: INTEGER<br/>type_affectation: STRING<br/>score_proximite: FLOAT<br/>propension_vote: FLOAT")
+Newsletter("Newsletter<br/>nom: STRING | KEY<br/>niveau: STRING")
+Sollicitation("Sollicitation<br/>id_sollicitation: STRING | KEY<br/>canal: STRING<br/>date: DATE<br/>issue: STRING")
+CercleProximite("CercleProximite<br/>nom: STRING | KEY<br/>rang: INTEGER")
+ObjectifAction("ObjectifAction<br/>nom: STRING | KEY<br/>description: STRING")
+Metier("Metier<br/>code: STRING | KEY<br/>libelle: STRING<br/>categorie: STRING")
+Adhesion("Adhesion<br/>id_adhesion: STRING | KEY<br/>annee: INTEGER<br/>statut: STRING")
+Ecole("Ecole<br/>code_uai: STRING | KEY<br/>nom: STRING<br/>effectif: INTEGER<br/>nb_adherents: INTEGER")
+Circonscription("Circonscription<br/>code_circo: STRING | KEY<br/>nom: STRING<br/>effectif: INTEGER")
+Section("Section<br/>code_section: STRING | KEY<br/>nb_adherents: INTEGER<br/>nb_elus_2022: INTEGER")
+Departement("Departement<br/>code_dept: STRING | KEY<br/>effectif: INTEGER")
+Academie("Academie<br/>nom: STRING | KEY<br/>region: STRING")
+Theme("Theme<br/>nom: STRING | KEY<br/>est_prioritaire: BOOLEAN")
+Action("Action<br/>id_action: STRING | KEY<br/>date: DATE")
+TypeAction("TypeAction<br/>nom: STRING | KEY<br/>poids_engagement: FLOAT")
+Campagne("Campagne<br/>id_campagne: STRING | KEY<br/>type: STRING")
+Election("Election<br/>id_election: STRING | KEY<br/>annee: INTEGER")
+InstanceElue("InstanceElue<br/>nom: STRING | KEY<br/>sieges: INTEGER")
+Segment("Segment<br/>id_segment: STRING | KEY<br/>axe: STRING<br/>priorite: INTEGER")
+
+%% Relations
+Contact -->|EXERCE_METIER| Metier
+Contact -->|DANS_CERCLE| CercleProximite
+Contact -->|A_PROPENSION<br/>score: FLOAT| ObjectifAction
+Contact -->|A_ADHESION| Adhesion
+Adhesion -->|ADHESION_DANS_SECTION| Section
+Contact -->|RATTACHE_A| Section
+Contact -->|TRAVAILLE_DANS| Ecole
+Ecole -->|ECOLE_DANS_CIRCO| Circonscription
+Circonscription -->|CIRCO_DANS_DEPARTEMENT| Departement
+Section -->|SECTION_COUVRE| Departement
+Departement -->|DEPARTEMENT_DANS_ACADEMIE| Academie
+Contact -->|INTERESSE_PAR<br/>poids: FLOAT| Theme
+Contact -->|A_PARTICIPE_A<br/>role: STRING| Action
+Action -->|DE_TYPE| TypeAction
+Action -->|ACTION_SUR_THEME| Theme
+Action -->|DANS_CAMPAGNE| Campagne
+Contact -->|CIBLE_PAR<br/>ouvert: BOOLEAN<br/>clique: BOOLEAN| Campagne
+Campagne -->|CAMPAGNE_SUR_THEME| Theme
+Campagne -->|CAMPAGNE_POUR_ELECTION| Election
+Contact -->|A_VOTE_A<br/>a_vote: BOOLEAN| Election
+Election -->|ELECTION_ELIT| InstanceElue
+Metier -->|VOTE_POUR<br/>college: STRING| InstanceElue
+Contact -->|DANS_SEGMENT| Segment
+Contact -->|ABONNE_A<br/>depuis: DATE| Newsletter
+Newsletter -->|EMISE_PAR| Section
+Campagne -->|VIA_NEWSLETTER| Newsletter
+Contact -->|A_RECU| Sollicitation
+Sollicitation -->|RELANCE_DANS_CAMPAGNE| Campagne
+Contact -->|MILITANT_DANS| Circonscription
+Ecole -->|A_REPONDU_A| Action
+
+%% Styling
+classDef node_0_color fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#000,font-size:12px
+class Contact node_0_color
+classDef node_1_color fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,color:#000,font-size:12px
+class CercleProximite node_1_color
+classDef node_2_color fill:#ede7f6,stroke:#5e35b1,stroke-width:3px,color:#000,font-size:12px
+class ObjectifAction node_2_color
+classDef node_3_color fill:#fff3e0,stroke:#f57c00,stroke-width:3px,color:#000,font-size:12px
+class Metier node_3_color
+classDef node_4_color fill:#fce4ec,stroke:#c2185b,stroke-width:3px,color:#000,font-size:12px
+class Adhesion node_4_color
+classDef node_5_color fill:#e0f2f1,stroke:#00695c,stroke-width:3px,color:#000,font-size:12px
+class Ecole node_5_color
+classDef node_6_color fill:#f1f8e9,stroke:#689f38,stroke-width:3px,color:#000,font-size:12px
+class Circonscription node_6_color
+classDef node_7_color fill:#fff8e1,stroke:#ffa000,stroke-width:3px,color:#000,font-size:12px
+class Section node_7_color
+classDef node_8_color fill:#e8eaf6,stroke:#3f51b5,stroke-width:3px,color:#000,font-size:12px
+class Departement node_8_color
+classDef node_9_color fill:#efebe9,stroke:#5d4037,stroke-width:3px,color:#000,font-size:12px
+class Academie node_9_color
+classDef node_10_color fill:#fafafa,stroke:#424242,stroke-width:3px,color:#000,font-size:12px
+class Theme node_10_color
+classDef node_11_color fill:#e1f5fe,stroke:#0277bd,stroke-width:3px,color:#000,font-size:12px
+class Action node_11_color
+classDef node_12_color fill:#f9fbe7,stroke:#827717,stroke-width:3px,color:#000,font-size:12px
+class TypeAction node_12_color
+classDef node_13_color fill:#fff1f0,stroke:#d32f2f,stroke-width:3px,color:#000,font-size:12px
+class Campagne node_13_color
+classDef node_14_color fill:#f4e6ff,stroke:#6a1b9a,stroke-width:3px,color:#000,font-size:12px
+class Election node_14_color
+classDef node_15_color fill:#e6f7ff,stroke:#1890ff,stroke-width:3px,color:#000,font-size:12px
+class InstanceElue node_15_color
+classDef node_16_color fill:#e8f5e8,stroke:#388e3c,stroke-width:3px,color:#000,font-size:12px
+class Segment node_16_color
+classDef node_17_color fill:#e0f7fa,stroke:#00838f,stroke-width:3px,color:#000,font-size:12px
+class Newsletter node_17_color
+classDef node_18_color fill:#fbe9e7,stroke:#bf360c,stroke-width:3px,color:#000,font-size:12px
+class Sollicitation node_18_color
