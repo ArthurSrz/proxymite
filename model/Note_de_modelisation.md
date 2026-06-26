@@ -78,6 +78,18 @@ Le contact est enrichi des champs SNUPers : `id_snupers` (socle de jointure entr
 
 Point structurel important : les **enquêtes carte scolaire et de grève sont répondues à l'échelle de l'école**, pas de l'individu — d'où la relation `Ecole -[:A_REPONDU_A]-> Action`, distincte de `Contact -[:A_PARTICIPE_A]-> Action`. C'est un signal d'implantation locale qui ne doit pas être confondu avec un signal individuel. Enfin, `MILITANT_DANS` capture l'information déclarative des sections (« un militant connu dans cette circonscription »), avec sa `source` — donnée déclarée, à pondérer différemment des données observées.
 
+## Inconnu — le potentiel théorique matérialisé
+
+Le nœud **Inconnu** (label `:Inconnu`) représente un enseignant que le syndicat n'a pas identifié. Chaque ETP arrondi de l'open data EN génère un nœud Inconnu rattaché à son Etablissement par `TRAVAILLE_DANS`. C'est la matérialisation du potentiel théorique : `Etablissement.effectif = count(Contact TRAVAILLE_DANS) + count(Inconnu TRAVAILLE_DANS)`.
+
+Lors de la réconciliation avec les contacts réels SNUPers, les Inconnus en trop sont supprimés : si une école a un effectif de 10 et que 3 contacts réels (cercle ≤ 3) arrivent, 3 Inconnus sont supprimés et 7 restent (les « non encore identifiés »). Convention d'identifiant : `Inconnu.id_inconnu = "{uai}#{index}"`, `Contact.id_contact = "snupers#{id}"` — pas de collision entre les deux espaces.
+
+**Décision de conception : seuls les cercles 1-3 réconclient.** SNUPers est un CRM d'accumulation historique — les 272k contacts cercle 4 (« contact périphérique », 58% de la base) ont un ratio 1.19x vs les effectifs EN avec 23k écoles en dépassement. Trop peu fiables comme indicateur d'affectation réelle. Les contacts cercle 4 sont chargés dans le graphe (TRAVAILLE_DANS, DANS_CERCLE, A_VOTE_A) mais portent `reconciliable: false` et ne réduisent pas le pool d'Inconnus. Les cercle ≤ 3 (198k contacts, ratio 0.54, 1 815 dépassements) portent `reconciliable: true` et déclenchent la suppression d'Inconnus.
+
+**Exclusion du personnel non-enseignant.** Les ASH (aide à la scolarisation handicap) et AESH (accompagnants) représentent 24k contacts en cercle 1-3. Ils sont exclus de la réconciliation (`reconciliable: false`) car l'open data effectifs EN ne mesure que `etp_enseignants` — il n'existe pas de statistique nationale sur les personnels non-enseignants. Ils restent dans le graphe comme `:Contact` pour le pilotage syndical.
+
+Cas de dépassement : quand le nombre de contacts réels dépasse l'effectif (mi-temps, données décalées), tous les Inconnus sont supprimés et `Etablissement.depassement = nb_reels - effectif` est posé.
+
 ## Partis pris de modélisation
 
 L'adhésion est un **nœud** (et non une propriété) pour préserver l'historique. Les scores restent des **propriétés** du contact (valeurs courantes recalculées). Cercles, objectifs d'action et types d'action sont des **nœuds de vocabulaire contrôlé**. Le contact est ancré à l'**école** (`TRAVAILLE_DANS`) pour descendre le pilotage jusqu'au niveau où le syndicat agit, tout en gardant le rattachement syndical à la `Section` (`RATTACHE_A`) — deux mailles complémentaires à réconcilier lors de l'audit.

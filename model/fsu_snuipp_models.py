@@ -41,17 +41,9 @@ class Contact(BaseModel):
     source: Optional[str] = None
     cree_le: Optional[datetime] = None
 
-    # --- Contacts DÉRIVÉS de l'open data effectifs (potentiel théorique) -------
-    # Matérialisation de Etablissement.effectif : 1 ETP enseignant = 1 Contact dérivé.
-    # Marqués derive=True pour rester séparables des ~150 000 contacts réels et
-    # inertes dans les requêtes électorales (pas de propension_vote / statut_adhesion).
-    derive: Optional[bool] = None           # True = contact synthétique (effectifs EN)
-    corps: Optional[str] = None             # Professeur des écoles | Agrégés | Certifiés | PLP | Autres titulaires | Non-titulaires
-    genre: Optional[str] = None             # F | H (réparti depuis la marginale femmes)
-    tranche_age: Optional[str] = None       # moins_35 | 35_50 | 50_plus | inconnu
-    tranche_anciennete: Optional[str] = None  # moins_2 | 2_5 | 5_8 | 8_plus | inconnu
+    corps: Optional[str] = None             # depuis idCorps SNUPers (PEHCLA, PEEX00...)
+    genre: Optional[str] = None             # M | F
     degre: Optional[str] = None             # 1d | 2d
-    annee_rentree: Optional[int] = None     # 2024
 
 
 class CercleProximite(BaseModel):
@@ -107,12 +99,33 @@ class Ecole(BaseModel):
     source: Optional[str] = None      # open_data_EN | local
 
 
+class Inconnu(BaseModel):
+    """Nœud synthétique matérialisant un ETP inconnu du syndicat (open data effectifs EN).
+
+    1 Inconnu = 1 ETP arrondi. Le pool d'Inconnus d'un établissement représente les
+    enseignants que le syndicat n'a pas encore identifiés. Lors de la réconciliation avec
+    les contacts réels (SNUPers), des Inconnus sont supprimés pour maintenir l'invariant :
+    effectif == count(Contact TRAVAILLE_DANS) + count(Inconnu TRAVAILLE_DANS).
+    """
+    node_label: ClassVar[str] = "Inconnu"
+
+    id_inconnu: str                          # "{uai}#{index}"
+    corps: Optional[str] = None              # Professeur des écoles | Agrégés | Certifiés | ...
+    genre: Optional[str] = None              # F | H (réparti depuis la marginale femmes)
+    tranche_age: Optional[str] = None        # moins_35 | 35_50 | 50_plus | inconnu
+    tranche_anciennete: Optional[str] = None # moins_2 | 2_5 | 5_8 | 8_plus | inconnu
+    type_affectation: Optional[str] = None   # titulaire | non_titulaire
+    degre: Optional[str] = None              # 1d | 2d
+    annee_rentree: Optional[int] = None      # 2024
+    source: Optional[str] = None             # effectifs_EN_2024
+
+
 class Etablissement(BaseModel):
     """Établissement (open data EN, 1er + 2nd degré) — nœud parapluie de la maille la plus fine.
 
     Généralise `Ecole` pour couvrir collèges/lycées (FSU = 1er + 2nd degré). Les nœuds de degré 1d
     portent AUSSI le label `:Ecole` (compat. avec la maille premier degré existante).
-    `effectif = round(etp_enseignants)` = nombre de Contacts dérivés rattachés (invariant).
+    `effectif = round(etp_enseignants)` = count(Contact) + count(Inconnu) rattachés (invariant).
     """
     node_label: ClassVar[str] = "Etablissement"
 
@@ -132,7 +145,10 @@ class Etablissement(BaseModel):
     longitude: Optional[float] = None
     degre: Optional[str] = None       # 1d | 2d
     nb_eleves: Optional[int] = None
-    effectif: Optional[int] = None    # round(etp_enseignants) = nb de Contacts dérivés
+    effectif: Optional[int] = None    # round(etp_enseignants) = count(Contact) + count(Inconnu)
+    nb_contacts_reels: Optional[int] = None    # cache : count(Contact TRAVAILLE_DANS)
+    nb_contacts_derives: Optional[int] = None  # cache : count(Inconnu TRAVAILLE_DANS)
+    depassement: Optional[int] = None          # nb_reels - effectif quand réels > ETP
     source: Optional[str] = None      # open_data_EN
 
 
@@ -331,14 +347,14 @@ class RattacheA(BaseModel):
 
 
 class TravailleDans(BaseModel):
+    """Partagée par Contact et Inconnu : (:Contact|Inconnu)-[:TRAVAILLE_DANS]->(:Etablissement)."""
     relationship_type: ClassVar[str] = "TRAVAILLE_DANS"
-    pattern: ClassVar[str] = "(:Contact)-[:TRAVAILLE_DANS]->(:Etablissement)"  # :Ecole pour 1d
-    sourceId: str   # Contact.id_contact
-    targetId: str   # Etablissement.code_uai (= Ecole.code_uai)
+    pattern: ClassVar[str] = "(:Contact|Inconnu)-[:TRAVAILLE_DANS]->(:Etablissement)"
+    sourceId: str   # Contact.id_contact ou Inconnu.id_inconnu
+    targetId: str   # Etablissement.code_uai
     depuis: Optional[date] = None    # contacts réels
-    # contacts dérivés (open data effectifs) :
-    source: Optional[str] = None     # effectifs_EN_2024
-    quotite: Optional[float] = None  # 1.0 (1 ETP arrondi)
+    source: Optional[str] = None     # effectifs_EN_2024 | snupers
+    quotite: Optional[float] = None  # 1.0 (Inconnu) ou réelle (Contact)
     annee: Optional[int] = None      # 2024
 
 
