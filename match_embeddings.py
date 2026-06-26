@@ -119,6 +119,18 @@ MERGE (c)-[r:PROBABLEMENT_IDENTIQUE]->(i)
 SET r.score = rec.score
 """
 
+CONTACT_EMB_CYPHER = """
+UNWIND $records AS rec
+MATCH (c:Contact {id_contact: rec.id})
+SET c.embedding = rec.embedding
+"""
+
+INCONNU_EMB_CYPHER = """
+UNWIND $records AS rec
+MATCH (i:Inconnu {id_inconnu: rec.id})
+SET i.embedding = rec.embedding
+"""
+
 
 def main():
     limit = int(sys.argv[1]) if len(sys.argv) > 1 else None
@@ -150,6 +162,7 @@ def main():
         print(f"{len(schools)} écoles avec Contact + Inconnu")
 
         total_matches = []
+        contact_emb_records, inconnu_emb_records = [], []
         total_texts = 0
 
         for idx, school in enumerate(schools):
@@ -165,6 +178,11 @@ def main():
             embs = get_embeddings(all_texts, api_key)
             contact_embs = embs[:len(contacts)]
             inconnu_embs = embs[len(contacts):]
+
+            for c, emb in zip(contacts, contact_embs):
+                contact_emb_records.append({"id": c["id"], "embedding": emb})
+            for inc, emb in zip(inconnus, inconnu_embs):
+                inconnu_emb_records.append({"id": inc["id"], "embedding": emb})
 
             matches = greedy_match(contacts, inconnus, contact_embs, inconnu_embs)
             total_matches.extend(matches)
@@ -187,6 +205,21 @@ def main():
                 driver.execute_query(MATCH_CYPHER, records=chunk, database_=db)
                 print(f"  {min(i + BATCH_NEO4J, len(total_matches))}/{len(total_matches)}", end="\r")
             print(f"  {len(total_matches)}/{len(total_matches)} ✓")
+
+            # Écrire les embeddings sur les nœuds
+            print("Écriture des embeddings sur les Contact...")
+            for i in range(0, len(contact_emb_records), BATCH_NEO4J):
+                chunk = contact_emb_records[i:i + BATCH_NEO4J]
+                driver.execute_query(CONTACT_EMB_CYPHER, records=chunk, database_=db)
+                print(f"  {min(i + BATCH_NEO4J, len(contact_emb_records))}/{len(contact_emb_records)}", end="\r")
+            print(f"  {len(contact_emb_records)}/{len(contact_emb_records)} ✓")
+
+            print("Écriture des embeddings sur les Inconnu...")
+            for i in range(0, len(inconnu_emb_records), BATCH_NEO4J):
+                chunk = inconnu_emb_records[i:i + BATCH_NEO4J]
+                driver.execute_query(INCONNU_EMB_CYPHER, records=chunk, database_=db)
+                print(f"  {min(i + BATCH_NEO4J, len(inconnu_emb_records))}/{len(inconnu_emb_records)}", end="\r")
+            print(f"  {len(inconnu_emb_records)}/{len(inconnu_emb_records)} ✓")
 
     print("Terminé.")
 
